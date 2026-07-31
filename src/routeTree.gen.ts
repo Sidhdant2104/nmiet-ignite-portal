@@ -10,33 +10,102 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as RegisterRouteImport } from './routes/register'
+import { Route as ApiAnnouncementsRouteImport } from './routes/api/announcements'
+import { Route as ApiProblemStatementsRouteImport } from './routes/api/problem-statements'
+import { Route as ApiRegisterRouteImport } from './routes/api/register'
+import { Route as ApiThemesRouteImport } from './routes/api/themes'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RegisterRoute = RegisterRouteImport.update({
+  id: '/register',
+  path: '/register',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAnnouncementsRoute = ApiAnnouncementsRouteImport.update({
+  id: '/api/announcements',
+  path: '/api/announcements',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiProblemStatementsRoute = ApiProblemStatementsRouteImport.update({
+  id: '/api/problem-statements',
+  path: '/api/problem-statements',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiRegisterRoute = ApiRegisterRouteImport.update({
+  id: '/api/register',
+  path: '/api/register',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiThemesRoute = ApiThemesRouteImport.update({
+  id: '/api/themes',
+  path: '/api/themes',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/register': typeof RegisterRoute
+  '/api/announcements': typeof ApiAnnouncementsRoute
+  '/api/problem-statements': typeof ApiProblemStatementsRoute
+  '/api/register': typeof ApiRegisterRoute
+  '/api/themes': typeof ApiThemesRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/register': typeof RegisterRoute
+  '/api/announcements': typeof ApiAnnouncementsRoute
+  '/api/problem-statements': typeof ApiProblemStatementsRoute
+  '/api/register': typeof ApiRegisterRoute
+  '/api/themes': typeof ApiThemesRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/register': typeof RegisterRoute
+  '/api/announcements': typeof ApiAnnouncementsRoute
+  '/api/problem-statements': typeof ApiProblemStatementsRoute
+  '/api/register': typeof ApiRegisterRoute
+  '/api/themes': typeof ApiThemesRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/register'
+    | '/api/announcements'
+    | '/api/problem-statements'
+    | '/api/register'
+    | '/api/themes'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/register'
+    | '/api/announcements'
+    | '/api/problem-statements'
+    | '/api/register'
+    | '/api/themes'
+  id:
+    | '__root__'
+    | '/'
+    | '/register'
+    | '/api/announcements'
+    | '/api/problem-statements'
+    | '/api/register'
+    | '/api/themes'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  RegisterRoute: typeof RegisterRoute
+  ApiAnnouncementsRoute: typeof ApiAnnouncementsRoute
+  ApiProblemStatementsRoute: typeof ApiProblemStatementsRoute
+  ApiRegisterRoute: typeof ApiRegisterRoute
+  ApiThemesRoute: typeof ApiThemesRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,22 +117,52 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/register': {
+      id: '/register'
+      path: '/register'
+      fullPath: '/register'
+      preLoaderRoute: typeof RegisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/announcements': {
+      id: '/api/announcements'
+      path: '/api/announcements'
+      fullPath: '/api/announcements'
+      preLoaderRoute: typeof ApiAnnouncementsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/problem-statements': {
+      id: '/api/problem-statements'
+      path: '/api/problem-statements'
+      fullPath: '/api/problem-statements'
+      preLoaderRoute: typeof ApiProblemStatementsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/register': {
+      id: '/api/register'
+      path: '/api/register'
+      fullPath: '/api/register'
+      preLoaderRoute: typeof ApiRegisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/themes': {
+      id: '/api/themes'
+      path: '/api/themes'
+      fullPath: '/api/themes'
+      preLoaderRoute: typeof ApiThemesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  RegisterRoute: RegisterRoute,
+  ApiAnnouncementsRoute: ApiAnnouncementsRoute,
+  ApiProblemStatementsRoute: ApiProblemStatementsRoute,
+  ApiRegisterRoute: ApiRegisterRoute,
+  ApiThemesRoute: ApiThemesRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
