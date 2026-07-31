@@ -1,0 +1,113 @@
+import { motion } from "framer-motion";
+import {
+  Award,
+  BriefcaseBusiness,
+  FileBadge,
+  Lightbulb,
+  Network,
+  Rocket,
+} from "lucide-react";
+import { Reveal, StaggerGroup, StaggerItem } from "@/components/motion/reveal";
+import { SectionHeading } from "@/components/section-heading";
+
+const benefits = [
+  {
+    icon: Lightbulb,
+    title: "Innovation",
+    body: "Turn a real ministry-level problem into a working prototype in 36 hours.",
+  },
+  {
+    icon: Network,
+    title: "Networking",
+    body: "Build with peers from across India and meet evaluators from industry.",
+  },
+  {
+    icon: BriefcaseBusiness,
+    title: "Internships",
+    body: "Strong teams get noticed by partner organisations and startups.",
+  },
+  {
+    icon: Award,
+    title: "National recognition",
+    body: "A grand finale win is a line on your resume that opens doors.",
+  },
+  {
+    icon: FileBadge,
+    title: "Certificates",
+    body: "Every shortlisted participant receives official recognition.",
+  },
+  {
+    icon: Rocket,
+    title: "Real impact",
+    body: "Winning solutions get incubated and deployed with the problem owner.",
+  },
+];
+
+const journey = [
+  { step: "01", title: "Form your team", body: "Six students, one leader, one faculty mentor." },
+  { step: "02", title: "Pick a statement", body: "Choose from 400+ statements across 17 themes." },
+  { step: "03", title: "Clear internals", body: "Present to the NMIET evaluation panel." },
+  { step: "04", title: "Go national", body: "Represent NMIET at the SIH grand finale." },
+];
+
+export function AboutSection() {
+  return (
+    <section id="about" className="section-pad relative overflow-hidden">
+      <div className="shell">
+        <SectionHeading
+          eyebrow="About SIH"
+          title={
+            <>
+              India&apos;s largest open innovation model, and{" "}
+              <span className="text-gradient">NMIET&apos;s route into it</span>
+            </>
+          }
+          description="Smart India Hackathon is a nationwide initiative where student teams solve pressing problems posted by ministries, PSUs and industry. NMIET runs an internal round first — the strongest teams go forward."
+        />
+
+        <div className="mt-16 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {journey.map((item, i) => (
+            <Reveal key={item.step} delay={i * 0.08}>
+              <div className="hover-lift group relative h-full overflow-hidden rounded-3xl border border-border bg-card p-6 shadow-soft">
+                <span className="font-display text-4xl font-semibold text-primary/25 transition-colors group-hover:text-primary/50">
+                  {item.step}
+                </span>
+                <h3 className="mt-4 text-lg font-semibold">{item.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{item.body}</p>
+                <motion.div
+                  aria-hidden
+                  initial={{ scaleX: 0 }}
+                  whileInView={{ scaleX: 1 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.9, delay: 0.2 + i * 0.1, ease: [0.22, 1, 0.36, 1] }}
+                  className="absolute inset-x-6 bottom-5 h-px origin-left bg-gradient-to-r from-primary via-brand-blue to-transparent"
+                />
+              </div>
+            </Reveal>
+          ))}
+        </div>
+
+        <div className="mt-24">
+          <SectionHeading
+            eyebrow="Why participate"
+            title="Six reasons students keep coming back"
+            align="center"
+          />
+          <StaggerGroup className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {benefits.map((b) => (
+              <StaggerItem key={b.title}>
+                <div className="hover-lift group h-full rounded-3xl border border-border bg-card p-7 shadow-soft">
+                  <span className="grid h-12 w-12 place-items-center rounded-2xl bg-primary-soft text-primary transition-transform duration-500 group-hover:-rotate-6">
+                    <b.icon className="h-5 w-5" aria-hidden />
+                  </span>
+                  <h3 className="mt-5 text-lg font-semibold">{b.title}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{b.body}</p>
+                </div>
+              </StaggerItem>
+            ))}
+          </StaggerGroup>
+        </div>
+      </div>
+    </section>
+  );
+}
