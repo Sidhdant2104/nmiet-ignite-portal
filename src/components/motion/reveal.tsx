@@ -32,9 +32,9 @@ export function Reveal({
   return (
     <MotionTag
       ref={ref}
-      className={className}
+      className={className ?? ""}
       initial={{ opacity: 0, y: 28 }}
-      animate={inView ? { opacity: 1, y: 0 } : undefined}
+      animate={inView ? { opacity: 1, y: 0 } : { opacity: 0, y: 28 }}
       transition={{ duration: 0.75, ease, delay }}
     >
       {children}
@@ -54,7 +54,7 @@ export function StaggerGroup({
   return (
     <motion.div
       ref={ref}
-      className={className}
+      className={className ?? ""}
       variants={stagger}
       initial="hidden"
       animate={inView ? "show" : "hidden"}

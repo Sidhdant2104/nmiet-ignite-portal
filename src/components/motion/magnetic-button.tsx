@@ -1,4 +1,4 @@
-import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
+import { motion, useMotionValue, useSpring } from "framer-motion";
 import { useRef, type ComponentProps, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
@@ -17,13 +17,11 @@ export function MagneticButton({
   const y = useMotionValue(0);
   const sx = useSpring(x, { stiffness: 240, damping: 18 });
   const sy = useSpring(y, { stiffness: 240, damping: 18 });
-  const tx = useTransform(sx, (v) => `${v}px`);
-  const ty = useTransform(sy, (v) => `${v}px`);
 
   return (
     <motion.button
       ref={ref}
-      style={{ x: tx, y: ty }}
+      style={{ x: sx, y: sy }}
       whileTap={{ scale: 0.97 }}
       onPointerMove={(e) => {
         if (e.pointerType !== "mouse" || !ref.current) return;
