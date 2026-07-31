@@ -11,7 +11,10 @@ export function MagneticButton({
   className,
   strength = 12,
   ...props
-}: Omit<ComponentProps<"button">, "style" | "ref"> & { children: ReactNode; strength?: number }) {
+}: Omit<
+  ComponentProps<"button">,
+  "style" | "ref" | "onAnimationStart" | "onAnimationEnd" | "onAnimationIteration" | "onDrag" | "onDragStart" | "onDragEnd"
+> & { children: ReactNode; strength?: number }) {
   const ref = useRef<HTMLButtonElement>(null);
   const x = useMotionValue(0);
   const y = useMotionValue(0);
