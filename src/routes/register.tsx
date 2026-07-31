@@ -18,7 +18,6 @@ import { z } from "zod";
 import { AmbientBackdrop } from "@/components/ambient-backdrop";
 import { MagneticButton } from "@/components/motion/magnetic-button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -410,15 +409,14 @@ function Field({
   error?: string | undefined;
   children: React.ReactNode;
 }) {
-  const id = label.toLowerCase().replace(/[^a-z0-9]+/g, "-");
   return (
     <div className="min-w-0">
-      <Label htmlFor={id} className="text-sm font-medium">
+      <label className="block text-sm font-medium">
         {label}
-      </Label>
-      <div className="mt-2 [&_button]:h-11 [&_button]:rounded-2xl [&_input]:h-11 [&_input]:rounded-2xl">
-        {children}
-      </div>
+        <div className="mt-2 [&_button]:h-11 [&_button]:rounded-2xl [&_input]:h-11 [&_input]:rounded-2xl">
+          {children}
+        </div>
+      </label>
       {error ? (
         <motion.p
           initial={{ opacity: 0, y: -4 }}
