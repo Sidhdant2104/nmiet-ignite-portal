@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as RegisterRouteImport } from './routes/register'
 import { Route as ApiAnnouncementsRouteImport } from './routes/api/announcements'
 import { Route as ApiProblemStatementsRouteImport } from './routes/api/problem-statements'
 import { Route as ApiRegisterRouteImport } from './routes/api/register'
@@ -18,6 +19,11 @@ import { Route as ApiThemesRouteImport } from './routes/api/themes'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RegisterRoute = RegisterRouteImport.update({
+  id: '/register',
+  path: '/register',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiAnnouncementsRoute = ApiAnnouncementsRouteImport.update({
@@ -43,6 +49,7 @@ const ApiThemesRoute = ApiThemesRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/register': typeof RegisterRoute
   '/api/announcements': typeof ApiAnnouncementsRoute
   '/api/problem-statements': typeof ApiProblemStatementsRoute
   '/api/register': typeof ApiRegisterRoute
@@ -50,6 +57,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/register': typeof RegisterRoute
   '/api/announcements': typeof ApiAnnouncementsRoute
   '/api/problem-statements': typeof ApiProblemStatementsRoute
   '/api/register': typeof ApiRegisterRoute
@@ -58,6 +66,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/register': typeof RegisterRoute
   '/api/announcements': typeof ApiAnnouncementsRoute
   '/api/problem-statements': typeof ApiProblemStatementsRoute
   '/api/register': typeof ApiRegisterRoute
@@ -67,6 +76,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/register'
     | '/api/announcements'
     | '/api/problem-statements'
     | '/api/register'
@@ -74,6 +84,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/register'
     | '/api/announcements'
     | '/api/problem-statements'
     | '/api/register'
@@ -81,6 +92,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/register'
     | '/api/announcements'
     | '/api/problem-statements'
     | '/api/register'
@@ -89,6 +101,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  RegisterRoute: typeof RegisterRoute
   ApiAnnouncementsRoute: typeof ApiAnnouncementsRoute
   ApiProblemStatementsRoute: typeof ApiProblemStatementsRoute
   ApiRegisterRoute: typeof ApiRegisterRoute
@@ -102,6 +115,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/register': {
+      id: '/register'
+      path: '/register'
+      fullPath: '/register'
+      preLoaderRoute: typeof RegisterRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/announcements': {
@@ -137,6 +157,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  RegisterRoute: RegisterRoute,
   ApiAnnouncementsRoute: ApiAnnouncementsRoute,
   ApiProblemStatementsRoute: ApiProblemStatementsRoute,
   ApiRegisterRoute: ApiRegisterRoute,

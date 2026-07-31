@@ -407,7 +407,7 @@ function Field({
   children,
 }: {
   label: string;
-  error?: string;
+  error?: string | undefined;
   children: React.ReactNode;
 }) {
   const id = label.toLowerCase().replace(/[^a-z0-9]+/g, "-");
