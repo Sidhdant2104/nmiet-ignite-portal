@@ -72,34 +72,57 @@ export function Hero() {
                 Register Now <ArrowRight className="h-4 w-4" />
               </MagneticButton>
             </Link>
-            <a href="#problem-statements">
+            <Link to="/problem-statements">
               <MagneticButton className="border border-border bg-card/70 px-7 py-3.5 text-foreground backdrop-blur hover:bg-accent">
                 <Compass className="h-4 w-4 text-brand-blue" /> Explore Problem Statements
               </MagneticButton>
-            </a>
+            </Link>
           </motion.div>
 
           <motion.dl
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.8, delay: 0.6 }}
-            className="mt-14 grid max-w-lg grid-cols-3 gap-6"
+            className="mt-14 grid gap-4 sm:grid-cols-2 xl:max-w-2xl"
           >
-            {[
-              { label: "Themes", value: 17, suffix: "" },
-              { label: "Problem statements", value: 400, suffix: "+" },
-              { label: "Prize pool", value: 50, suffix: "L+" },
-            ].map((stat) => (
-              <div key={stat.label}>
-                <dt className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
-                  {stat.label}
-                </dt>
-                <dd className="mt-1.5 font-display text-2xl font-semibold sm:text-3xl">
-                  <Counter to={stat.value} suffix={stat.suffix} />
-                </dd>
-              </div>
-            ))}
+            <div className="rounded-3xl border border-border bg-card/70 p-5 backdrop-blur">
+              <dt className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Themes</dt>
+              <dd className="mt-1.5 font-display text-3xl font-semibold">
+                <Counter to={18} />
+              </dd>
+            </div>
+
+            <div className="rounded-3xl border border-border bg-card/70 p-5 backdrop-blur">
+              <dt className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+                Problem statements
+              </dt>
+              <dd className="mt-1.5 font-display text-xl font-semibold">Coming soon</dd>
+              <p className="mt-1.5 text-[0.7rem] leading-snug text-muted-foreground">
+                Will be updated automatically once officially released by SIH
+              </p>
+            </div>
+
+            <div className="rounded-3xl border border-border bg-card/70 p-5 backdrop-blur">
+              <dt className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+                Internal selection
+              </dt>
+              <dd className="mt-1.5 font-display text-3xl font-semibold">45 + 5</dd>
+              <p className="mt-1.5 text-[0.7rem] leading-snug text-muted-foreground">
+                45 shortlisted + 5 waitlisted
+              </p>
+            </div>
+
+            <div className="rounded-3xl border border-border bg-card/70 p-5 backdrop-blur">
+              <dt className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+                Team size
+              </dt>
+              <dd className="mt-1.5 font-display text-xl font-semibold">6 members</dd>
+              <p className="mt-1.5 text-[0.7rem] leading-snug text-muted-foreground">
+                1 faculty mentor · at least 1 female member
+              </p>
+            </div>
           </motion.dl>
+
         </div>
 
         <motion.div style={{ y: yNear, opacity: fade }} className="relative">

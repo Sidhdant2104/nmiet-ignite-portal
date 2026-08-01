@@ -1,18 +1,23 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowLeft,
   ArrowRight,
   Check,
   CircleCheckBig,
+  Download,
   ExternalLink,
+  Home,
   Loader2,
+  Pencil,
+  ShieldCheck,
   Users,
+  Venus,
 } from "lucide-react";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, type FieldErrors } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 import { AmbientBackdrop } from "@/components/ambient-backdrop";
@@ -25,12 +30,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { submitRegistration } from "@/lib/api";
-import { themesQuery } from "@/lib/api";
+import { submitRegistration, themesQuery } from "@/lib/api";
 
 const title = "Register your team — NMIET SIH Portal";
 const description =
-  "Submit your NMIET internal Smart India Hackathon 2026 entry: team details, problem statement, members and faculty mentor.";
+  "Submit your NMIET internal Smart India Hackathon 2026 entry: team details, complete member details and faculty mentor, with a full review before submission.";
 
 export const Route = createFileRoute("/register")({
   head: () => ({
@@ -39,90 +43,102 @@ export const Route = createFileRoute("/register")({
       { name: "description", content: description },
       { property: "og:title", content: title },
       { property: "og:description", content: description },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: RegisterPage,
 });
 
-const mobile = z.string().regex(/^[6-9]\d{9}$/, "Enter a valid 10-digit mobile number");
-const name = z.string().min(3, "Enter the full name");
+const departments = [
+  "Computer Engineering",
+  "Information Technology",
+  "AI & Data Science",
+  "Electronics & Telecommunication",
+  "Mechanical Engineering",
+  "Civil Engineering",
+  "Electrical Engineering",
+  "MBA / MCA",
+];
+const years = ["First Year", "Second Year", "Third Year", "Final Year", "Post Graduate"];
+const divisions = ["A", "B", "C", "D"];
+
+const personSchema = z.object({
+  name: z.string().trim().min(3, "Enter the full name").max(80),
+  email: z.string().trim().email("Enter a valid email").max(120),
+  mobile: z.string().regex(/^[6-9]\d{9}$/, "Enter a valid 10-digit mobile number"),
+  department: z.string().min(2, "Select a department"),
+  year: z.string().min(2, "Select the academic year"),
+  division: z.string().trim().min(1, "Enter the division").max(4),
+  roll: z.string().trim().min(1, "Enter the roll number").max(20),
+});
 
 const schema = z.object({
-  teamName: z.string().min(3, "Team name must be at least 3 characters"),
-  psTitle: z.string().min(6, "Enter the problem statement title"),
-  psId: z.string().min(4, "Enter the problem statement ID"),
-  category: z.enum(["Software", "Hardware"], { message: "Choose a category" }),
-  theme: z.string().min(2, "Choose a theme"),
-
-  leaderName: name,
-  leaderEmail: z.string().email("Enter a valid email"),
-  leaderMobile: mobile,
-
-  member2Name: name,
-  member2Email: z.string().email("Enter a valid email"),
-  member2Mobile: mobile,
-  member3Name: name,
-  member4Name: name,
-  member5Name: name,
-  member6Name: name,
-
-  mentorName: name,
-  mentorEmail: z.string().email("Enter a valid email"),
-  mentorMobile: mobile,
+  team: z.object({
+    teamName: z.string().trim().min(3, "Team name must be at least 3 characters").max(60),
+    psTitle: z.string().trim().min(6, "Enter the problem statement title").max(200),
+    psId: z.string().trim().min(3, "Enter the problem statement ID").max(40),
+    category: z.enum(["Software", "Hardware"], { message: "Choose a category" }),
+    theme: z.string().min(2, "Choose a theme"),
+  }),
+  leader: personSchema,
+  members: z.array(personSchema).length(5),
+  mentor: z.object({
+    name: z.string().trim().min(3, "Enter the mentor's full name").max(80),
+    email: z.string().trim().email("Enter a valid email").max(120),
+    mobile: z.string().regex(/^[6-9]\d{9}$/, "Enter a valid 10-digit mobile number"),
+    department: z.string().trim().max(80).optional().or(z.literal("")),
+  }),
 });
 
 type FormValues = z.infer<typeof schema>;
+type Person = z.infer<typeof personSchema>;
 
-const stepFields: (keyof FormValues)[][] = [
-  ["teamName", "psTitle", "psId", "category", "theme"],
-  ["leaderName", "leaderEmail", "leaderMobile"],
-  [
-    "member2Name",
-    "member2Email",
-    "member2Mobile",
-    "member3Name",
-    "member4Name",
-    "member5Name",
-    "member6Name",
-  ],
-  ["mentorName", "mentorEmail", "mentorMobile"],
-  [],
-];
+const emptyPerson: Person = {
+  name: "",
+  email: "",
+  mobile: "",
+  department: "",
+  year: "",
+  division: "",
+  roll: "",
+};
 
 const steps = [
   { label: "Team", hint: "Problem statement & category" },
   { label: "Leader", hint: "Single point of contact" },
-  { label: "Members", hint: "Five more students" },
+  { label: "Members", hint: "Members 2 to 6" },
   { label: "Mentor", hint: "Faculty guide" },
   { label: "Review", hint: "Confirm & submit" },
 ];
 
+const stepPaths: ("team" | "leader" | "members" | "mentor")[][] = [
+  ["team"],
+  ["leader"],
+  ["members"],
+  ["mentor"],
+  [],
+];
+
 function RegisterPage() {
   const [step, setStep] = useState(0);
-  const [reference, setReference] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState<{ reference: string; values: FormValues } | null>(null);
   const { data: themes } = useQuery(themesQuery);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     mode: "onTouched",
     defaultValues: {
-      teamName: "",
-      psTitle: "",
-      psId: "",
-      theme: "",
-      leaderName: "",
-      leaderEmail: "",
-      leaderMobile: "",
-      member2Name: "",
-      member2Email: "",
-      member2Mobile: "",
-      member3Name: "",
-      member4Name: "",
-      member5Name: "",
-      member6Name: "",
-      mentorName: "",
-      mentorEmail: "",
-      mentorMobile: "",
+      team: { teamName: "", psTitle: "", psId: "", theme: "" },
+      leader: { ...emptyPerson },
+      members: [
+        { ...emptyPerson },
+        { ...emptyPerson },
+        { ...emptyPerson },
+        { ...emptyPerson },
+        { ...emptyPerson },
+      ],
+      mentor: { name: "", email: "", mobile: "", department: "" },
     } as Partial<FormValues> as FormValues,
   });
 
@@ -138,22 +154,34 @@ function RegisterPage() {
   const values = watch();
 
   const next = async () => {
-    const valid = await trigger(stepFields[step]);
+    const valid = await trigger(stepPaths[step] as never);
     if (!valid) {
-      toast.error("Please fix the highlighted fields");
+      toast.error("Please fix the highlighted fields before continuing");
       return;
     }
     setStep((s) => Math.min(s + 1, steps.length - 1));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const back = () => {
+    setStep((s) => Math.max(0, s - 1));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const goTo = (target: number) => {
+    setStep(target);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const onSubmit = async (data: FormValues) => {
     const res = await submitRegistration(data);
-    setReference(res.reference);
+    setSubmitted({ reference: res.reference, values: data });
     toast.success("Internal registration recorded");
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  if (reference) {
-    return <SuccessScreen reference={reference} teamName={values.teamName} />;
+  if (submitted) {
+    return <SuccessScreen reference={submitted.reference} values={submitted.values} />;
   }
 
   return (
@@ -172,12 +200,12 @@ function RegisterPage() {
             Register your <span className="text-gradient">team</span>
           </h1>
           <p className="mt-4 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg">
-            Five short steps. Nothing is submitted to the national portal from here — this is
-            NMIET&apos;s internal selection entry.
+            Five steps, nothing submitted until you confirm on the review page. Exactly 6 members,
+            at least one female member, all from NMIET, plus one faculty mentor.
           </p>
         </motion.div>
 
-        <Stepper step={step} />
+        <Stepper step={step} onSelect={goTo} />
 
         <form
           onSubmit={handleSubmit(onSubmit)}
@@ -192,24 +220,24 @@ function RegisterPage() {
               transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
             >
               {step === 0 ? (
-                <Fieldset legend="Team details" hint="Tell us what you're building and where it fits.">
-                  <Field label="Team name" error={errors.teamName?.message}>
-                    <Input placeholder="e.g. Team Aarambh" {...register("teamName")} />
+                <Fieldset
+                  legend="Team details"
+                  hint="Tell us what you're building and where it fits."
+                >
+                  <Field label="Team name" error={errors.team?.teamName?.message}>
+                    <Input placeholder="e.g. Team Aarambh" {...register("team.teamName")} />
                   </Field>
-                  <Field label="Problem statement title" error={errors.psTitle?.message}>
-                    <Input
-                      placeholder="Paste the statement title"
-                      {...register("psTitle")}
-                    />
+                  <Field label="Problem statement title" error={errors.team?.psTitle?.message}>
+                    <Input placeholder="Paste the statement title" {...register("team.psTitle")} />
                   </Field>
-                  <Field label="Problem statement ID" error={errors.psId?.message}>
-                    <Input placeholder="e.g. SIH26-1042" {...register("psId")} />
+                  <Field label="Problem statement ID" error={errors.team?.psId?.message}>
+                    <Input placeholder="e.g. SIH26-1042" {...register("team.psId")} />
                   </Field>
-                  <Field label="Category" error={errors.category?.message}>
+                  <Field label="Category" error={errors.team?.category?.message}>
                     <Select
-                      value={values.category ?? ""}
+                      value={values.team?.category ?? ""}
                       onValueChange={(v) =>
-                        setValue("category", v as FormValues["category"], {
+                        setValue("team.category", v as FormValues["team"]["category"], {
                           shouldValidate: true,
                         })
                       }
@@ -223,10 +251,10 @@ function RegisterPage() {
                       </SelectContent>
                     </Select>
                   </Field>
-                  <Field label="Theme / domain" error={errors.theme?.message}>
+                  <Field label="Theme / domain" error={errors.team?.theme?.message}>
                     <Select
-                      value={values.theme}
-                      onValueChange={(v) => setValue("theme", v, { shouldValidate: true })}
+                      value={values.team?.theme ?? ""}
+                      onValueChange={(v) => setValue("team.theme", v, { shouldValidate: true })}
                     >
                       <SelectTrigger aria-label="Theme">
                         <SelectValue placeholder="Choose a theme" />
@@ -244,67 +272,63 @@ function RegisterPage() {
               ) : null}
 
               {step === 1 ? (
-                <Fieldset legend="Team leader" hint="All official communication goes here.">
-                  <Field label="Leader name" error={errors.leaderName?.message}>
-                    <Input {...register("leaderName")} />
-                  </Field>
-                  <Field label="Leader email" error={errors.leaderEmail?.message}>
-                    <Input type="email" inputMode="email" {...register("leaderEmail")} />
-                  </Field>
-                  <Field label="Leader mobile" error={errors.leaderMobile?.message}>
-                    <Input inputMode="numeric" maxLength={10} {...register("leaderMobile")} />
-                  </Field>
-                </Fieldset>
+                <PersonFields
+                  legend="Team leader"
+                  hint="All official communication goes to the leader."
+                  prefix="leader"
+                  errors={errors.leader}
+                  register={register}
+                  values={values.leader}
+                  setValue={setValue}
+                />
               ) : null}
 
               {step === 2 ? (
-                <Fieldset legend="Team members" hint="Five members besides the leader.">
-                  <Field label="Member 2 name" error={errors.member2Name?.message}>
-                    <Input {...register("member2Name")} />
-                  </Field>
-                  <Field label="Member 2 email" error={errors.member2Email?.message}>
-                    <Input type="email" inputMode="email" {...register("member2Email")} />
-                  </Field>
-                  <Field label="Member 2 mobile" error={errors.member2Mobile?.message}>
-                    <Input inputMode="numeric" maxLength={10} {...register("member2Mobile")} />
-                  </Field>
-                  <Field label="Member 3 name" error={errors.member3Name?.message}>
-                    <Input {...register("member3Name")} />
-                  </Field>
-                  <Field label="Member 4 name" error={errors.member4Name?.message}>
-                    <Input {...register("member4Name")} />
-                  </Field>
-                  <Field label="Member 5 name" error={errors.member5Name?.message}>
-                    <Input {...register("member5Name")} />
-                  </Field>
-                  <Field label="Member 6 name" error={errors.member6Name?.message}>
-                    <Input {...register("member6Name")} />
-                  </Field>
-                </Fieldset>
+                <div className="space-y-12">
+                  <Notice />
+                  {[0, 1, 2, 3, 4].map((i) => (
+                    <PersonFields
+                      key={i}
+                      legend={`Member ${i + 2}`}
+                      hint="Complete details are mandatory for every member."
+                      prefix={`members.${i}` as const}
+                      errors={errors.members?.[i]}
+                      register={register}
+                      values={values.members?.[i]}
+                      setValue={setValue}
+                    />
+                  ))}
+                </div>
               ) : null}
 
               {step === 3 ? (
-                <Fieldset legend="Faculty mentor" hint="Confirm with your mentor before submitting.">
-                  <Field label="Faculty mentor name" error={errors.mentorName?.message}>
-                    <Input {...register("mentorName")} />
+                <Fieldset
+                  legend="Faculty mentor"
+                  hint="Confirm with your mentor before submitting."
+                >
+                  <Field label="Full name" error={errors.mentor?.name?.message}>
+                    <Input {...register("mentor.name")} />
                   </Field>
-                  <Field label="Faculty mentor email" error={errors.mentorEmail?.message}>
-                    <Input type="email" inputMode="email" {...register("mentorEmail")} />
+                  <Field label="Email address" error={errors.mentor?.email?.message}>
+                    <Input type="email" inputMode="email" {...register("mentor.email")} />
                   </Field>
-                  <Field label="Faculty mentor mobile" error={errors.mentorMobile?.message}>
-                    <Input inputMode="numeric" maxLength={10} {...register("mentorMobile")} />
+                  <Field label="Mobile number" error={errors.mentor?.mobile?.message}>
+                    <Input inputMode="numeric" maxLength={10} {...register("mentor.mobile")} />
+                  </Field>
+                  <Field label="Department (optional)" error={errors.mentor?.department?.message}>
+                    <Input {...register("mentor.department")} />
                   </Field>
                 </Fieldset>
               ) : null}
 
-              {step === 4 ? <Review values={values} /> : null}
+              {step === 4 ? <Review values={values} onEdit={goTo} /> : null}
             </motion.div>
           </AnimatePresence>
 
           <div className="mt-9 flex flex-col-reverse gap-3 border-t border-border pt-6 sm:flex-row sm:items-center sm:justify-between">
             <button
               type="button"
-              onClick={() => setStep((s) => Math.max(0, s - 1))}
+              onClick={back}
               disabled={step === 0}
               className="inline-flex items-center justify-center gap-2 rounded-full border border-border px-5 py-3 text-sm font-medium transition-colors hover:bg-accent disabled:pointer-events-none disabled:opacity-40"
             >
@@ -317,7 +341,8 @@ function RegisterPage() {
                 onClick={next}
                 className="bg-primary text-primary-foreground shadow-glow hover:brightness-105"
               >
-                Continue <ArrowRight className="h-4 w-4" aria-hidden />
+                {step === 3 ? "Review entry" : "Continue"}{" "}
+                <ArrowRight className="h-4 w-4" aria-hidden />
               </MagneticButton>
             ) : (
               <MagneticButton
@@ -331,7 +356,7 @@ function RegisterPage() {
                   </>
                 ) : (
                   <>
-                    Submit registration <Check className="h-4 w-4" aria-hidden />
+                    Confirm &amp; Submit <Check className="h-4 w-4" aria-hidden />
                   </>
                 )}
               </MagneticButton>
@@ -343,14 +368,127 @@ function RegisterPage() {
   );
 }
 
-function Stepper({ step }: { step: number }) {
+function Notice() {
+  return (
+    <div className="flex gap-3 rounded-3xl border border-brand-green/30 bg-brand-green/10 p-5">
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-brand-green/20 text-brand-green">
+        <Venus className="h-5 w-5" aria-hidden />
+      </span>
+      <p className="text-sm leading-relaxed text-muted-foreground">
+        Your team must have <strong className="text-foreground">exactly 6 members</strong> including
+        the leader, with <strong className="text-foreground">at least one female member</strong>, and
+        all members must belong to the same college.
+      </p>
+    </div>
+  );
+}
+
+type RegisterFn = ReturnType<typeof useForm<FormValues>>["register"];
+type SetValueFn = ReturnType<typeof useForm<FormValues>>["setValue"];
+
+function PersonFields({
+  legend,
+  hint,
+  prefix,
+  errors,
+  register,
+  values,
+  setValue,
+}: {
+  legend: string;
+  hint: string;
+  prefix: "leader" | `members.${number}`;
+  errors: FieldErrors<Person> | undefined;
+  register: RegisterFn;
+  values: Partial<Person> | undefined;
+  setValue: SetValueFn;
+}) {
+  const path = (key: keyof Person) => `${prefix}.${key}` as const;
+
+  return (
+    <Fieldset legend={legend} hint={hint}>
+      <Field label="Full name" error={errors?.name?.message}>
+        <Input {...register(path("name") as never)} />
+      </Field>
+      <Field label="Email address" error={errors?.email?.message}>
+        <Input type="email" inputMode="email" {...register(path("email") as never)} />
+      </Field>
+      <Field label="Mobile number" error={errors?.mobile?.message}>
+        <Input inputMode="numeric" maxLength={10} {...register(path("mobile") as never)} />
+      </Field>
+      <Field label="Department" error={errors?.department?.message}>
+        <Select
+          value={values?.department ?? ""}
+          onValueChange={(v) => setValue(path("department") as never, v as never, { shouldValidate: true })}
+        >
+          <SelectTrigger aria-label={`${legend} department`}>
+            <SelectValue placeholder="Select department" />
+          </SelectTrigger>
+          <SelectContent className="max-h-72">
+            {departments.map((d) => (
+              <SelectItem key={d} value={d}>
+                {d}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </Field>
+      <Field label="Academic year" error={errors?.year?.message}>
+        <Select
+          value={values?.year ?? ""}
+          onValueChange={(v) => setValue(path("year") as never, v as never, { shouldValidate: true })}
+        >
+          <SelectTrigger aria-label={`${legend} academic year`}>
+            <SelectValue placeholder="Select year" />
+          </SelectTrigger>
+          <SelectContent>
+            {years.map((y) => (
+              <SelectItem key={y} value={y}>
+                {y}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </Field>
+      <Field label="Division" error={errors?.division?.message}>
+        <Select
+          value={values?.division ?? ""}
+          onValueChange={(v) =>
+            setValue(path("division") as never, v as never, { shouldValidate: true })
+          }
+        >
+          <SelectTrigger aria-label={`${legend} division`}>
+            <SelectValue placeholder="Select division" />
+          </SelectTrigger>
+          <SelectContent>
+            {divisions.map((d) => (
+              <SelectItem key={d} value={d}>
+                {d}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </Field>
+      <Field label="Roll number" error={errors?.roll?.message}>
+        <Input {...register(path("roll") as never)} />
+      </Field>
+    </Fieldset>
+  );
+}
+
+function Stepper({ step, onSelect }: { step: number; onSelect: (i: number) => void }) {
   return (
     <ol className="mt-12 grid gap-2 sm:grid-cols-5" aria-label="Registration progress">
       {steps.map((s, i) => {
         const state = i < step ? "done" : i === step ? "current" : "upcoming";
         return (
           <li key={s.label} className="min-w-0">
-            <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => (i <= step ? onSelect(i) : undefined)}
+              disabled={i > step}
+              className="flex w-full items-center gap-2 text-left disabled:cursor-default"
+            >
               <span
                 className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-semibold transition-colors ${
                   state === "done"
@@ -362,10 +500,8 @@ function Stepper({ step }: { step: number }) {
               >
                 {state === "done" ? <Check className="h-3.5 w-3.5" aria-hidden /> : i + 1}
               </span>
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-medium">{s.label}</span>
-              </span>
-            </div>
+              <span className="block min-w-0 truncate text-sm font-medium">{s.label}</span>
+            </button>
             <div className="mt-2 h-1 overflow-hidden rounded-full bg-border">
               <motion.div
                 className="h-full bg-primary"
@@ -431,64 +567,95 @@ function Field({
   );
 }
 
-function Review({ values }: { values: Partial<FormValues> }) {
-  const groups = [
+function personRows(p: Partial<Person> | undefined): [string, string | undefined][] {
+  return [
+    ["Name", p?.name],
+    ["Email", p?.email],
+    ["Mobile", p?.mobile],
+    ["Department", p?.department],
+    ["Year", p?.year],
+    ["Division", p?.division],
+    ["Roll number", p?.roll],
+  ];
+}
+
+function reviewGroups(values: Partial<FormValues>) {
+  return [
     {
-      title: "Team",
+      title: "Team details",
+      step: 0,
       rows: [
-        ["Team name", values.teamName],
-        ["Problem statement", values.psTitle],
-        ["PS ID", values.psId],
-        ["Category", values.category],
-        ["Theme", values.theme],
-      ],
+        ["Team name", values.team?.teamName],
+        ["Problem statement", values.team?.psTitle],
+        ["PS ID", values.team?.psId],
+        ["Category", values.team?.category],
+        ["Theme", values.team?.theme],
+      ] as [string, string | undefined][],
     },
-    {
-      title: "Team leader",
-      rows: [
-        ["Name", values.leaderName],
-        ["Email", values.leaderEmail],
-        ["Mobile", values.leaderMobile],
-      ],
-    },
-    {
-      title: "Members",
-      rows: [
-        ["Member 2", `${values.member2Name ?? ""} · ${values.member2Email ?? ""}`],
-        ["Member 3", values.member3Name],
-        ["Member 4", values.member4Name],
-        ["Member 5", values.member5Name],
-        ["Member 6", values.member6Name],
-      ],
-    },
+    { title: "Team leader", step: 1, rows: personRows(values.leader) },
+    ...(values.members ?? []).map((m, i) => ({
+      title: `Member ${i + 2}`,
+      step: 2,
+      rows: personRows(m),
+    })),
     {
       title: "Faculty mentor",
+      step: 3,
       rows: [
-        ["Name", values.mentorName],
-        ["Email", values.mentorEmail],
-        ["Mobile", values.mentorMobile],
-      ],
+        ["Name", values.mentor?.name],
+        ["Email", values.mentor?.email],
+        ["Mobile", values.mentor?.mobile],
+        ["Department", values.mentor?.department],
+      ] as [string, string | undefined][],
     },
   ];
+}
+
+function Review({
+  values,
+  onEdit,
+}: {
+  values: Partial<FormValues>;
+  onEdit: (step: number) => void;
+}) {
+  const groups = reviewGroups(values);
 
   return (
     <div>
-      <h2 className="font-display text-xl font-semibold">Review your entry</h2>
+      <h2 className="font-display text-xl font-semibold">Review &amp; confirmation</h2>
       <p className="mt-1.5 text-sm text-muted-foreground">
-        Check every detail — the coordinator uses exactly this data for nomination.
+        Nothing has been submitted yet. Verify every detail — edit any section, then confirm.
       </p>
+
+      <div className="mt-6 flex gap-3 rounded-3xl border border-border bg-accent/40 p-4">
+        <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-brand-green" aria-hidden />
+        <p className="text-sm leading-relaxed text-muted-foreground">
+          Confirm your team has exactly 6 members with at least one female member, all from NMIET,
+          and one faculty mentor.
+        </p>
+      </div>
+
       <div className="mt-7 grid gap-4 sm:grid-cols-2">
         {groups.map((g, i) => (
           <motion.div
             key={g.title}
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: i * 0.07 }}
+            transition={{ duration: 0.4, delay: Math.min(i, 6) * 0.05 }}
             className="rounded-3xl border border-border bg-card p-5 shadow-soft"
           >
-            <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-              {g.title}
-            </h3>
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                {g.title}
+              </h3>
+              <button
+                type="button"
+                onClick={() => onEdit(g.step)}
+                className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1 text-[0.7rem] font-medium transition-colors hover:bg-accent"
+              >
+                <Pencil className="h-3 w-3" aria-hidden /> Edit
+              </button>
+            </div>
             <dl className="mt-4 space-y-3">
               {g.rows.map(([label, value]) => (
                 <div key={label} className="grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)] gap-3">
@@ -504,19 +671,50 @@ function Review({ values }: { values: Partial<FormValues> }) {
   );
 }
 
-function SuccessScreen({ reference, teamName }: { reference: string; teamName?: string }) {
+function SuccessScreen({ reference, values }: { reference: string; values: FormValues }) {
+  const groups = reviewGroups(values);
+
+  const download = () => {
+    const lines = [
+      "NMIET SIH Portal — Internal Registration Summary",
+      `Reference number: ${reference}`,
+      "",
+      ...groups.flatMap((g) => [
+        g.title.toUpperCase(),
+        ...g.rows.map(([label, value]) => `  ${label}: ${value || "-"}`),
+        "",
+      ]),
+    ];
+    const blob = new Blob([lines.join("\n")], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${reference}-summary.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Summary downloaded (placeholder file)");
+  };
+
   return (
-    <div className="relative flex min-h-[80dvh] items-center overflow-hidden pb-24 pt-32">
+    <div className="relative overflow-hidden pb-28 pt-32 lg:pt-40">
       <AmbientBackdrop className="-z-10" />
-      <div className="shell max-w-2xl text-center">
+      <div className="shell max-w-3xl text-center">
         <motion.span
-          initial={{ scale: 0.7, opacity: 0 }}
+          initial={{ scale: 0.6, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-          className="mx-auto grid h-20 w-20 place-items-center rounded-3xl bg-brand-green/15 text-brand-green shadow-soft"
+          transition={{ type: "spring", stiffness: 160, damping: 14 }}
+          className="relative mx-auto grid h-28 w-28 place-items-center rounded-full bg-brand-green/15 text-brand-green shadow-soft"
         >
-          <CircleCheckBig className="h-9 w-9" aria-hidden />
+          <motion.span
+            aria-hidden
+            initial={{ scale: 0.8, opacity: 0.6 }}
+            animate={{ scale: 1.5, opacity: 0 }}
+            transition={{ duration: 1.6, repeat: Infinity, ease: "easeOut" }}
+            className="absolute inset-0 rounded-full bg-brand-green/25"
+          />
+          <CircleCheckBig className="h-12 w-12" aria-hidden />
         </motion.span>
+
         <motion.h1
           initial={{ opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
@@ -529,10 +727,10 @@ function SuccessScreen({ reference, teamName }: { reference: string; teamName?: 
           initial={{ opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.2 }}
-          className="mt-4 text-base leading-relaxed text-muted-foreground sm:text-lg"
+          className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg"
         >
-          {teamName ? `${teamName} is` : "Your team is"} on the internal shortlist queue. Keep the
-          reference number handy for all follow-ups with the coordinator.
+          {values.team.teamName} is on the internal shortlist queue. Keep the reference number handy
+          for all follow-ups with the coordinator.
         </motion.p>
 
         <motion.div
@@ -547,17 +745,43 @@ function SuccessScreen({ reference, teamName }: { reference: string; teamName?: 
           <span className="mt-2 font-mono text-2xl font-semibold">{reference}</span>
         </motion.div>
 
+        <div className="mt-10 grid gap-4 text-left sm:grid-cols-2">
+          {groups.map((g) => (
+            <div key={g.title} className="rounded-3xl border border-border bg-card p-5 shadow-soft">
+              <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                {g.title}
+              </h2>
+              <dl className="mt-4 space-y-2.5">
+                {g.rows.map(([label, value]) => (
+                  <div key={label} className="grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)] gap-3">
+                    <dt className="truncate text-xs text-muted-foreground">{label}</dt>
+                    <dd className="min-w-0 break-words text-sm font-medium">{value || "—"}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          ))}
+        </div>
+
         <div className="mt-10 flex flex-wrap justify-center gap-3">
+          <MagneticButton
+            type="button"
+            onClick={download}
+            className="border border-border bg-card/70 px-6 py-3.5 text-foreground hover:bg-accent"
+          >
+            <Download className="h-4 w-4" aria-hidden /> Download summary
+          </MagneticButton>
           <a href="https://sih.gov.in" target="_blank" rel="noreferrer">
-            <MagneticButton className="bg-primary px-7 py-3.5 text-primary-foreground shadow-glow hover:brightness-105">
-              Proceed to Official SIH Portal <ExternalLink className="h-4 w-4" aria-hidden />
+            <MagneticButton className="bg-primary px-6 py-3.5 text-primary-foreground shadow-glow hover:brightness-105">
+              Proceed to official SIH registration{" "}
+              <ExternalLink className="h-4 w-4" aria-hidden />
             </MagneticButton>
           </a>
-          <a href="/">
-            <MagneticButton className="border border-border bg-card/70 px-7 py-3.5 text-foreground hover:bg-accent">
-              Back to home
+          <Link to="/">
+            <MagneticButton className="border border-border bg-card/70 px-6 py-3.5 text-foreground hover:bg-accent">
+              <Home className="h-4 w-4" aria-hidden /> Return home
             </MagneticButton>
-          </a>
+          </Link>
         </div>
         <p className="mt-8 text-xs text-muted-foreground">
           Demo mode: nothing was stored. Connect a backend to persist entries.

@@ -37,6 +37,7 @@ export const themeIcons: Record<string, LucideIcon> = {
   shapes: Shapes,
   "gamepad-2": Gamepad2,
   rocket: Rocket,
+  shield: ShieldCheck,
 };
 
 export function getThemeIcon(name: string): LucideIcon {
