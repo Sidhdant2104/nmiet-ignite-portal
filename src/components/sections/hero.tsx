@@ -72,11 +72,11 @@ export function Hero() {
                 Register Now <ArrowRight className="h-4 w-4" />
               </MagneticButton>
             </Link>
-            <a href="#problem-statements">
+            <Link to="/problem-statements">
               <MagneticButton className="border border-border bg-card/70 px-7 py-3.5 text-foreground backdrop-blur hover:bg-accent">
                 <Compass className="h-4 w-4 text-brand-blue" /> Explore Problem Statements
               </MagneticButton>
-            </a>
+            </Link>
           </motion.div>
 
           <motion.dl
