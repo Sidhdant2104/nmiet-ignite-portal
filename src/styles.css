@@ -55,7 +55,7 @@
 
 :root {
   --radius: 1rem;
-  --background: oklch(0.988 0.004 80);
+  --background: oklch(0.975 0.008 80);
   --foreground: oklch(0.19 0.02 260);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.19 0.02 260);
@@ -74,13 +74,13 @@
   --brand-green: oklch(0.6 0.16 152);
   --destructive: oklch(0.58 0.22 25);
   --destructive-foreground: oklch(0.99 0.005 80);
-  --border: oklch(0.91 0.008 260);
+  --border: oklch(0.88 0.012 260);
   --input: oklch(0.91 0.008 260);
   --ring: oklch(0.7 0.19 45);
-  --surface: oklch(1 0 0 / 70%);
-  --surface-strong: oklch(1 0 0 / 88%);
+  --surface: oklch(1 0 0 / 82%);
+  --surface-strong: oklch(1 0 0 / 94%);
 
-  --shadow-soft: 0 1px 2px oklch(0.2 0.03 260 / 6%), 0 8px 24px oklch(0.2 0.03 260 / 6%);
+  --shadow-soft: 0 4px 12px oklch(0.2 0.03 260 / 8%), 0 12px 36px oklch(0.2 0.03 260 / 10%);
   --shadow-lift: 0 2px 4px oklch(0.2 0.03 260 / 6%), 0 24px 60px oklch(0.2 0.03 260 / 12%);
   --shadow-glow: 0 20px 70px oklch(0.7 0.19 45 / 28%);
 
@@ -90,9 +90,9 @@
     oklch(0.62 0.19 30),
     oklch(0.56 0.2 264)
   );
-  --gradient-mesh: radial-gradient(60% 60% at 15% 10%, oklch(0.7 0.19 45 / 22%), transparent 70%),
-    radial-gradient(50% 50% at 85% 15%, oklch(0.56 0.2 264 / 20%), transparent 70%),
-    radial-gradient(60% 60% at 50% 95%, oklch(0.6 0.16 152 / 16%), transparent 70%);
+  --gradient-mesh: radial-gradient(60% 60% at 15% 10%, oklch(0.7 0.19 45 / 30%), transparent 70%),
+    radial-gradient(50% 50% at 85% 15%, oklch(0.56 0.2 264 / 26%), transparent 70%),
+    radial-gradient(60% 60% at 50% 95%, oklch(0.6 0.16 152 / 22%) transparent 70%);
 }
 
 .dark {
@@ -225,7 +225,7 @@
 @utility shell {
   width: 100%;
   margin-inline: auto;
-  max-width: 80rem;
+  max-width: 88rem;
   padding-inline: 1.25rem;
   @media (min-width: 768px) {
     padding-inline: 2rem;

@@ -1,3 +1,6 @@
+import { AnimatePresence } from "framer-motion";
+import { IntroAnimation } from "@/components/IntroAnimation";
+import { useIntroAnimation } from "@/hooks/use-intro-animation";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,
@@ -85,14 +88,33 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: "@Lovable" },
-      { title: "Lovable App" },
-      { property: "og:title", content: "Lovable App" },
-      { name: "twitter:title", content: "Lovable App" },
-      { name: "description", content: "NMIET SIH Connect is a premium frontend portal for students to engage with the Smart India Hackathon." },
-      { property: "og:description", content: "NMIET SIH Connect is a premium frontend portal for students to engage with the Smart India Hackathon." },
-      { name: "twitter:description", content: "NMIET SIH Connect is a premium frontend portal for students to engage with the Smart India Hackathon." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/bbf61513-243c-4158-a6a5-88ba87b54520/id-preview-b2490f84--12612204-b3c8-4480-ba61-c5ec9f149932.lovable.app-1785504147502.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/bbf61513-243c-4158-a6a5-88ba87b54520/id-preview-b2490f84--12612204-b3c8-4480-ba61-c5ec9f149932.lovable.app-1785504147502.png" },
+      { title: "NMIET SIH PORTAL" },
+      { property: "og:title", content: "NMIET SIH PORTAL" },
+      { name: "twitter:title", content: "NMIET SIH PORTAL" },
+      {
+        name: "description",
+        content: "Official NMIET Smart India Hackathon 2026 Internal Selection Portal",
+      },
+      {
+        property: "og:description",
+        content:
+          "NMIET SIH Connect is a premium frontend portal for students to engage with the Smart India Hackathon.",
+      },
+      {
+        name: "twitter:description",
+        content:
+          "NMIET SIH Connect is a premium frontend portal for students to engage with the Smart India Hackathon.",
+      },
+      {
+        property: "og:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/bbf61513-243c-4158-a6a5-88ba87b54520/id-preview-b2490f84--12612204-b3c8-4480-ba61-c5ec9f149932.lovable.app-1785504147502.png",
+      },
+      {
+        name: "twitter:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/bbf61513-243c-4158-a6a5-88ba87b54520/id-preview-b2490f84--12612204-b3c8-4480-ba61-c5ec9f149932.lovable.app-1785504147502.png",
+      },
     ],
     links: [
       {
@@ -131,18 +153,25 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const intro = useIntroAnimation();
 
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
+        <AnimatePresence>
+          {intro.shouldPlay && (
+            <IntroAnimation onComplete={intro.complete} />
+          )}
+        </AnimatePresence>
+
         <div className="flex min-h-dvh flex-col">
           <Navbar />
           <main className="flex-1">
-            {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
             <Outlet />
           </main>
           <Footer />
         </div>
+
         <Toaster />
       </ThemeProvider>
     </QueryClientProvider>

@@ -8,7 +8,6 @@ import { ProblemStatementsPreview } from "@/components/sections/problem-statemen
 import { SelectionFlowSection } from "@/components/sections/selection-flow";
 import { TeamStructureSection } from "@/components/sections/team-structure";
 import { ThemesSection } from "@/components/sections/themes";
-import { TimelineSection } from "@/components/sections/timeline";
 
 const title = "NMIET SIH Portal — Smart India Hackathon 2026";
 const description =
@@ -38,7 +37,6 @@ function Index() {
       <ThemesSection />
       <ProblemStatementsPreview />
       <SelectionFlowSection />
-      <TimelineSection />
       <FaqSection />
       <ContactSection />
     </>

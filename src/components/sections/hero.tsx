@@ -1,15 +1,25 @@
 import { Link } from "@tanstack/react-router";
 import { motion, useScroll, useTransform } from "framer-motion";
-import { ArrowRight, Compass, Sparkles, Users } from "lucide-react";
+import { ArrowRight, CheckCircle2, Compass, ListChecks, Sparkles, Users } from "lucide-react";
 import { useRef } from "react";
 import { AmbientBackdrop, GridLines } from "@/components/ambient-backdrop";
 import { Counter } from "@/components/motion/counter";
 import { MagneticButton } from "@/components/motion/magnetic-button";
 import { AnnouncementTicker } from "@/components/sections/announcement-ticker";
+import { SupportedBySection } from "@/components/sections/supported-by";
 
 const ease = [0.22, 1, 0.36, 1] as const;
 
 const words = "NMIET SIH Portal".split(" ");
+
+const selectionMiniSteps = [
+  "Registration",
+  "Internal Hackathon",
+  "Faculty Evaluation",
+  "Top 45 Teams",
+  "5 Waitlisted",
+  "SIH Nomination",
+];
 
 export function Hero() {
   const ref = useRef<HTMLDivElement>(null);
@@ -19,11 +29,12 @@ export function Hero() {
   const fade = useTransform(scrollYProgress, [0, 0.8], [1, 0]);
 
   return (
-    <section id="home" ref={ref} className="relative isolate overflow-hidden pb-24 pt-36 lg:pb-32 lg:pt-44">
+    <section id="home" ref={ref} className="relative isolate overflow-hidden pb-16 pt-36 lg:pb-20 lg:pt-44">
       <motion.div style={{ y: yFar }} className="absolute inset-0 -z-10">
         <AmbientBackdrop />
         <GridLines />
       </motion.div>
+      
 
       <div className="shell grid items-center gap-16 lg:grid-cols-[1.05fr_0.95fr]">
         <div>
@@ -85,14 +96,14 @@ export function Hero() {
             transition={{ duration: 0.8, delay: 0.6 }}
             className="mt-14 grid gap-4 sm:grid-cols-2 xl:max-w-2xl"
           >
-            <div className="rounded-3xl border border-border bg-card/70 p-5 backdrop-blur">
+            <div className="hover-lift rounded-3xl border border-border bg-card/70 p-5 backdrop-blur">
               <dt className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Themes</dt>
               <dd className="mt-1.5 font-display text-3xl font-semibold">
                 <Counter to={18} />
               </dd>
             </div>
 
-            <div className="rounded-3xl border border-border bg-card/70 p-5 backdrop-blur">
+            <div className="hover-lift rounded-3xl border border-border bg-card/70 p-5 backdrop-blur">
               <dt className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
                 Problem statements
               </dt>
@@ -102,17 +113,17 @@ export function Hero() {
               </p>
             </div>
 
-            <div className="rounded-3xl border border-border bg-card/70 p-5 backdrop-blur">
+            <div className="hover-lift rounded-3xl border border-border bg-card/70 p-5 backdrop-blur">
               <dt className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
                 Internal selection
               </dt>
               <dd className="mt-1.5 font-display text-3xl font-semibold">45 + 5</dd>
               <p className="mt-1.5 text-[0.7rem] leading-snug text-muted-foreground">
-                45 shortlisted + 5 waitlisted
+                Top 45 teams selected + 5 waitlisted
               </p>
             </div>
 
-            <div className="rounded-3xl border border-border bg-card/70 p-5 backdrop-blur">
+            <div className="hover-lift rounded-3xl border border-border bg-card/70 p-5 backdrop-blur">
               <dt className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
                 Team size
               </dt>
@@ -122,7 +133,6 @@ export function Hero() {
               </p>
             </div>
           </motion.dl>
-
         </div>
 
         <motion.div style={{ y: yNear, opacity: fade }} className="relative">
@@ -130,10 +140,13 @@ export function Hero() {
         </motion.div>
       </div>
 
-      <div className="shell mt-20">
+      <div className="shell mt-16">
         <AnnouncementTicker />
       </div>
-    </section>
+
+      <div className="shell mt-14">
+        <SupportedBySection />
+      </div>    </section>
   );
 }
 
@@ -156,33 +169,39 @@ function HeroVisual() {
         initial={{ opacity: 0, scale: 0.94 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.9, ease, delay: 0.2 }}
-        className="glass-strong absolute left-1/2 top-1/2 w-[74%] -translate-x-1/2 -translate-y-1/2 rounded-3xl p-5 shadow-lift"
+        className="glass-strong absolute left-1/2 top-1/2 w-[78%] -translate-x-1/2 -translate-y-1/2 rounded-3xl p-5 shadow-lift"
       >
         <div className="flex items-center justify-between">
           <span className="text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-            Team draft
+            Internal selection process
           </span>
-          <span className="rounded-full bg-brand-green/15 px-2 py-0.5 text-[0.65rem] font-semibold text-brand-green">
-            Ready
-          </span>
+          <ListChecks className="h-4 w-4 text-brand-green" aria-hidden />
         </div>
         <p className="mt-3 font-display text-base font-semibold leading-snug">
-          Predictive maintenance for municipal water pumping stations
+          45 + 5 Internal Selection
         </p>
-        <p className="mt-1 text-xs text-muted-foreground">SIH26-1042 · Smart Automation</p>
-        <div className="mt-4 flex items-center gap-2">
-          {["A", "R", "S", "K", "M", "P"].map((initial, i) => (
-            <motion.span
-              key={initial}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5 + i * 0.07 }}
-              className="grid h-7 w-7 place-items-center rounded-full border border-border bg-card text-[0.65rem] font-semibold"
+        <p className="mt-1 text-xs text-muted-foreground">
+          Top 45 teams selected · 5 waitlisted for SIH 2026
+        </p>
+        <ol className="mt-4 space-y-2">
+          {selectionMiniSteps.map((label, i) => (
+            <motion.li
+              key={label}
+              initial={{ opacity: 0, x: -8 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.4 + i * 0.07 }}
+              className="flex items-center gap-2 text-xs"
             >
-              {initial}
-            </motion.span>
+              <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-primary/15 text-[0.6rem] font-semibold text-primary">
+                {i + 1}
+              </span>
+              <span className="text-muted-foreground">{label}</span>
+              {i < 2 ? (
+                <CheckCircle2 className="ml-auto h-3.5 w-3.5 text-brand-green" aria-hidden />
+              ) : null}
+            </motion.li>
           ))}
-        </div>
+        </ol>
       </motion.div>
 
       <motion.div
@@ -203,7 +222,10 @@ function HeroVisual() {
         <div className="text-[0.65rem] uppercase tracking-[0.14em] text-muted-foreground">
           Internal shortlist
         </div>
-        <div className="mt-1 font-display text-lg font-semibold">Top 12 teams</div>
+        <div className="mt-1 font-display text-lg font-semibold leading-tight">
+          Top 45 Selected
+        </div>
+        <div className="text-xs font-medium text-brand-green">+ 5 Waitlisted</div>
       </motion.div>
     </div>
   );

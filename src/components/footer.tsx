@@ -26,7 +26,7 @@ export function Footer() {
               { label: "About SIH", href: "/#about" },
               { label: "Themes", href: "/#themes" },
               { label: "Problem statements", href: "/#problem-statements" },
-              { label: "Timeline", href: "/#timeline" },
+              { label: "Selection process", href: "/#selection" },
             ].map((l) => (
               <li key={l.label}>
                 <a className="text-muted-foreground transition-colors hover:text-foreground" href={l.href}>
@@ -68,6 +68,28 @@ export function Footer() {
             </li>
           </ul>
         </div>
+      </div>
+      <div className="shell border-t border-border py-8">
+        <p className="mb-5 text-center text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+          Partner organisations
+        </p>
+        <ul className="flex flex-wrap items-center justify-center gap-x-8 gap-y-4 opacity-85">
+          {[
+            { name: "NMIET", logo: "/logos/nmiet-logo.png" },
+            { name: "IIC", logo: "/logos/IIC.png" },
+            { name: "Smart India Hackathon", logo: "/logos/SIH.png" },
+            { name: "Ministry of Education", logo: "/logos/MOE.png" },
+            { name: "NMVPM", logo: "/logos/nmpvp.png" },
+          ].map((p) => (
+            <li key={p.name}>
+              <img
+                src={p.logo}
+                alt={p.name}
+                className="h-10 w-auto max-w-[5.5rem] dark:invert-[0.12]"
+              />
+            </li>
+          ))}
+        </ul>
       </div>
       <div className="shell flex flex-col gap-2 border-t border-border py-6 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
         <p>© {new Date().getFullYear()} NMIET Innovation Cell. Built by students, for students.</p>

@@ -1,18 +1,23 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useLocation } from "@tanstack/react-router";
 import { AnimatePresence, motion, useScroll, useTransform } from "framer-motion";
-import { Menu, Moon, Sun, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { ChevronDown, Menu, Moon, Sun, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { MagneticButton } from "@/components/motion/magnetic-button";
 import { useTheme } from "@/hooks/use-theme";
 import { cn } from "@/lib/utils";
 
-const navItems = [
+const primaryNavItems = [
   { label: "Home", href: "/#home" },
-  { label: "About SIH", href: "/#about" },
+  { label: "About", href: "/#about" },
   { label: "Themes", href: "/#themes" },
-  { label: "Problem Statements", href: "/problem-statements" },
+  { label: "Problems", href: "/problem-statements" },
+  { label: "Journey", href: "/previous-years" },
+];
+
+const moreNavItems = [
+  { label: "Organizing Committee", href: "/organizing-committee" },
   { label: "Guidelines", href: "/guidelines" },
-  { label: "Timeline", href: "/#timeline" },
+  { label: "Timeline", href: "/#selection" },
   { label: "FAQ", href: "/#faq" },
   { label: "Contact", href: "/#contact" },
 ];
@@ -35,7 +40,11 @@ function ThemeToggle() {
           transition={{ duration: 0.25 }}
           className="grid place-items-center"
         >
-          {theme === "dark" ? <Sun className="h-[1.05rem] w-[1.05rem]" /> : <Moon className="h-[1.05rem] w-[1.05rem]" />}
+          {theme === "dark" ? (
+            <Sun className="h-[1.05rem] w-[1.05rem]" />
+          ) : (
+            <Moon className="h-[1.05rem] w-[1.05rem]" />
+          )}
         </motion.span>
       </AnimatePresence>
     </button>
@@ -44,13 +53,17 @@ function ThemeToggle() {
 
 export function Navbar() {
   const [open, setOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
+  const moreRef = useRef<HTMLLIElement>(null);
+  const location = useLocation();
   const { scrollY } = useScroll();
   const [scrolled, setScrolled] = useState(false);
   const progress = useTransform(scrollY, [0, 2400], ["0%", "100%"]);
 
   useEffect(() => {
-    const unsub = scrollY.on("change", (v) => setScrolled(v > 24));
-    return unsub;
+    const unsubscribe = scrollY.on("change", (value) => setScrolled(value > 24));
+    return unsubscribe;
   }, [scrollY]);
 
   useEffect(() => {
@@ -59,6 +72,27 @@ export function Navbar() {
       document.body.style.overflow = "";
     };
   }, [open]);
+
+  useEffect(() => {
+    setOpen(false);
+    setMoreOpen(false);
+    setMobileMoreOpen(false);
+  }, [location.href]);
+
+  useEffect(() => {
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (moreRef.current && !moreRef.current.contains(event.target as Node)) setMoreOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMoreOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOnOutsideClick);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsideClick);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, []);
 
   return (
     <header className="fixed inset-x-0 top-0 z-50">
@@ -77,35 +111,97 @@ export function Navbar() {
           aria-label="Primary"
           className="shell grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 py-3 lg:flex lg:justify-between"
         >
-          <Link to="/" className="flex min-w-0 items-center gap-3" aria-label="NMIET SIH Portal home">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary text-sm font-bold text-primary-foreground shadow-glow">
-              N
-            </span>
-            <span className="min-w-0">
-              <span className="block truncate font-display text-sm font-semibold leading-tight">
+          <Link
+            to="/"
+            className="flex shrink-0 items-center gap-4"
+            aria-label="NMIET SIH Portal home"
+          >
+            <div className="flex shrink-0 items-center gap-2">
+              <img
+                src="/logos/nmiet-logo.png"
+                alt="NMIET"
+                className="h-8 w-auto object-contain sm:h-10 md:h-12"
+              />
+              <img
+                src="/logos/IIC.png"
+                alt="Innovation & Incubation Council"
+                className="h-7 w-auto object-contain sm:h-8 md:h-10"
+              />
+            </div>
+            <div className="leading-tight">
+              <h1 className="whitespace-nowrap font-display text-sm font-semibold">
                 NMIET SIH Portal
-              </span>
-              <span className="block truncate text-[0.7rem] text-muted-foreground">
+              </h1>
+              <p className="whitespace-nowrap text-xs text-muted-foreground">
                 Smart India Hackathon 2026
-              </span>
-            </span>
+              </p>
+            </div>
           </Link>
 
-          <ul className="hidden items-center gap-1 xl:flex">
-            {navItems.map((item) => (
+          <ul className="hidden items-center gap-0.5 lg:flex">
+            {primaryNavItems.map((item) => (
               <li key={item.label}>
-                <a
-                  href={item.href}
-                  className="rounded-full px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                >
-                  {item.label}
-                </a>
+<Link
+  to={item.href}
+  className="whitespace-nowrap rounded-full px-2.5 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+>
+  {item.label}
+</Link>
               </li>
             ))}
+            <li
+              ref={moreRef}
+              className="relative"
+              onMouseEnter={() => setMoreOpen(true)}
+              onMouseLeave={() => setMoreOpen(false)}
+            >
+              <button
+                type="button"
+                aria-haspopup="menu"
+                aria-expanded={moreOpen}
+                onClick={() => setMoreOpen((value) => !value)}
+                className="flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              >
+                More
+                <ChevronDown
+                  className={cn(
+                    "h-3.5 w-3.5 transition-transform duration-200",
+                    moreOpen && "rotate-180",
+                  )}
+                />
+              </button>
+              <AnimatePresence>
+                {moreOpen && (
+                  <motion.ul
+                    role="menu"
+                    initial={{ opacity: 0, y: -8, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -8, scale: 0.98 }}
+                    transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                    className="glass-strong absolute right-0 top-full mt-2 w-56 origin-top-right rounded-2xl p-1.5 shadow-lift"
+                  >
+                    {moreNavItems.map((item) => (
+                      <li key={item.label} role="none">
+<Link
+  to={item.href}
+  role="menuitem"
+  onClick={() => setMoreOpen(false)}
+  className="block rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+>
+                          {item.label}
+                        </Link>
+                      </li>
+                    ))}
+                  </motion.ul>
+                )}
+              </AnimatePresence>
+            </li>
           </ul>
 
           <div className="flex items-center gap-2">
-            <ThemeToggle />
+            <div className="hidden sm:block">
+              <ThemeToggle />
+            </div>
             <Link to="/register" className="hidden sm:block">
               <MagneticButton className="bg-primary text-primary-foreground shadow-glow hover:brightness-105">
                 Register
@@ -113,10 +209,10 @@ export function Navbar() {
             </Link>
             <button
               type="button"
-              onClick={() => setOpen((v) => !v)}
+              onClick={() => setOpen((value) => !value)}
               aria-label={open ? "Close menu" : "Open menu"}
               aria-expanded={open}
-              className="grid h-11 w-11 place-items-center rounded-full border border-border bg-card/60 xl:hidden"
+              className="grid h-11 w-11 place-items-center rounded-full border border-border bg-card/60 lg:hidden"
             >
               {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
@@ -125,26 +221,64 @@ export function Navbar() {
       </div>
 
       <AnimatePresence>
-        {open ? (
+        {open && (
           <motion.div
             initial={{ opacity: 0, y: -12 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -12 }}
             transition={{ duration: 0.25 }}
-            className="glass-strong xl:hidden"
+            className="glass-strong lg:hidden"
           >
             <ul className="shell flex flex-col gap-1 py-4">
-              {navItems.map((item) => (
+              <li className="flex justify-center pt-2">
+                <ThemeToggle />
+              </li>
+              {primaryNavItems.map((item) => (
                 <li key={item.label}>
-                  <a
-                    href={item.href}
-                    onClick={() => setOpen(false)}
-                    className="block rounded-xl px-4 py-3 text-base font-medium text-foreground/90 transition-colors hover:bg-accent"
-                  >
-                    {item.label}
-                  </a>
+                  <Link
+  to={item.href}
+  onClick={() => setOpen(false)}
+  className="block rounded-xl px-4 py-3 text-base font-medium text-foreground/90 transition-colors hover:bg-accent"
+>
+  {item.label}
+</Link>
                 </li>
               ))}
+              <li>
+                <button
+                  type="button"
+                  aria-expanded={mobileMoreOpen}
+                  onClick={() => setMobileMoreOpen((value) => !value)}
+                  className="flex w-full items-center justify-between rounded-xl px-4 py-3 text-left text-base font-medium text-foreground/90 transition-colors hover:bg-accent"
+                >
+                  More{" "}
+                  <ChevronDown
+                    className={cn("h-4 w-4 transition-transform", mobileMoreOpen && "rotate-180")}
+                  />
+                </button>
+                <AnimatePresence initial={false}>
+                  {mobileMoreOpen && (
+                    <motion.ul
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="overflow-hidden pl-4"
+                    >
+                      {moreNavItems.map((item) => (
+                        <li key={item.label}>
+                          <Link
+  to={item.href}
+  className="whitespace-nowrap rounded-full px-2.5 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+>
+  {item.label}
+</Link>
+                        </li>
+                      ))}
+                    </motion.ul>
+                  )}
+                </AnimatePresence>
+              </li>
               <li className="pt-2">
                 <Link
                   to="/register"
@@ -156,7 +290,7 @@ export function Navbar() {
               </li>
             </ul>
           </motion.div>
-        ) : null}
+        )}
       </AnimatePresence>
     </header>
   );

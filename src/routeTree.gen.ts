@@ -11,6 +11,8 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as GuidelinesRouteImport } from './routes/guidelines'
+import { Route as OrganizingCommitteeRouteImport } from './routes/organizing-committee'
+import { Route as PreviousYearsRouteImport } from './routes/previous-years'
 import { Route as ProblemStatementsRouteImport } from './routes/problem-statements'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as ApiAnnouncementsRouteImport } from './routes/api/announcements'
@@ -26,6 +28,16 @@ const IndexRoute = IndexRouteImport.update({
 const GuidelinesRoute = GuidelinesRouteImport.update({
   id: '/guidelines',
   path: '/guidelines',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OrganizingCommitteeRoute = OrganizingCommitteeRouteImport.update({
+  id: '/organizing-committee',
+  path: '/organizing-committee',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviousYearsRoute = PreviousYearsRouteImport.update({
+  id: '/previous-years',
+  path: '/previous-years',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProblemStatementsRoute = ProblemStatementsRouteImport.update({
@@ -62,6 +74,8 @@ const ApiThemesRoute = ApiThemesRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/guidelines': typeof GuidelinesRoute
+  '/organizing-committee': typeof OrganizingCommitteeRoute
+  '/previous-years': typeof PreviousYearsRoute
   '/problem-statements': typeof ProblemStatementsRoute
   '/register': typeof RegisterRoute
   '/api/announcements': typeof ApiAnnouncementsRoute
@@ -72,6 +86,8 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/guidelines': typeof GuidelinesRoute
+  '/organizing-committee': typeof OrganizingCommitteeRoute
+  '/previous-years': typeof PreviousYearsRoute
   '/problem-statements': typeof ProblemStatementsRoute
   '/register': typeof RegisterRoute
   '/api/announcements': typeof ApiAnnouncementsRoute
@@ -83,6 +99,8 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/guidelines': typeof GuidelinesRoute
+  '/organizing-committee': typeof OrganizingCommitteeRoute
+  '/previous-years': typeof PreviousYearsRoute
   '/problem-statements': typeof ProblemStatementsRoute
   '/register': typeof RegisterRoute
   '/api/announcements': typeof ApiAnnouncementsRoute
@@ -95,6 +113,8 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/guidelines'
+    | '/organizing-committee'
+    | '/previous-years'
     | '/problem-statements'
     | '/register'
     | '/api/announcements'
@@ -105,6 +125,8 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/guidelines'
+    | '/organizing-committee'
+    | '/previous-years'
     | '/problem-statements'
     | '/register'
     | '/api/announcements'
@@ -115,6 +137,8 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/guidelines'
+    | '/organizing-committee'
+    | '/previous-years'
     | '/problem-statements'
     | '/register'
     | '/api/announcements'
@@ -126,6 +150,8 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   GuidelinesRoute: typeof GuidelinesRoute
+  OrganizingCommitteeRoute: typeof OrganizingCommitteeRoute
+  PreviousYearsRoute: typeof PreviousYearsRoute
   ProblemStatementsRoute: typeof ProblemStatementsRoute
   RegisterRoute: typeof RegisterRoute
   ApiAnnouncementsRoute: typeof ApiAnnouncementsRoute
@@ -148,6 +174,20 @@ declare module '@tanstack/react-router' {
       path: '/guidelines'
       fullPath: '/guidelines'
       preLoaderRoute: typeof GuidelinesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/organizing-committee': {
+      id: '/organizing-committee'
+      path: '/organizing-committee'
+      fullPath: '/organizing-committee'
+      preLoaderRoute: typeof OrganizingCommitteeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/previous-years': {
+      id: '/previous-years'
+      path: '/previous-years'
+      fullPath: '/previous-years'
+      preLoaderRoute: typeof PreviousYearsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/problem-statements': {
@@ -198,6 +238,8 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   GuidelinesRoute: GuidelinesRoute,
+  OrganizingCommitteeRoute: OrganizingCommitteeRoute,
+  PreviousYearsRoute: PreviousYearsRoute,
   ProblemStatementsRoute: ProblemStatementsRoute,
   RegisterRoute: RegisterRoute,
   ApiAnnouncementsRoute: ApiAnnouncementsRoute,
@@ -208,3 +250,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
