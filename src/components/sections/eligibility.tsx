@@ -1,101 +1,84 @@
-import { CalendarCheck, CheckCircle2, GraduationCap, ShieldCheck } from "lucide-react";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
+import { Building2, GraduationCap, UserRound, Users, Venus } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { Reveal } from "@/components/motion/reveal";
+import { MagneticButton } from "@/components/motion/magnetic-button";
 import { SectionHeading } from "@/components/section-heading";
 
 const cards = [
   {
+    icon: Users,
+    title: "Exactly 6 members",
+    body: "Every team must consist of exactly 6 student members — no more, no fewer.",
+    tone: "text-primary",
+    bg: "bg-primary-soft",
+  },
+  {
+    icon: Venus,
+    title: "1 female member mandatory",
+    body: "At least ONE female member is mandatory in every team. Plan for it while forming your team.",
+    tone: "text-brand-green",
+    bg: "bg-brand-green/15",
+  },
+  {
+    icon: Building2,
+    title: "Same college only",
+    body: "All 6 team members must belong to the same college — NMIET students only for this internal entry.",
+    tone: "text-brand-blue",
+    bg: "bg-brand-blue/15",
+  },
+  {
     icon: GraduationCap,
-    title: "Who can apply",
-    body: "Any NMIET student currently enrolled in a UG or PG programme, across all departments and years.",
-  },
-  {
-    icon: ShieldCheck,
-    title: "Team requirements",
-    body: "Exactly 6 students per team with at least one female member, plus one faculty mentor.",
-  },
-  {
-    icon: CalendarCheck,
-    title: "One entry rule",
-    body: "A student may appear in only one internal entry. Duplicate names invalidate both teams.",
-  },
-];
-
-const faqs = [
-  {
-    q: "Can first-year students participate?",
-    a: "Yes. First-year students are encouraged to join as members, and many finalists have first-year contributors. Team leaders are usually second year and above simply because coordination takes time.",
-  },
-  {
-    q: "Can a team mix departments and years?",
-    a: "Absolutely — cross-department teams tend to perform better because hardware, software and design skills sit in one room.",
-  },
-  {
-    q: "Is a female member mandatory?",
-    a: "For the software edition, SIH requires at least one female member in every team. Plan for it while forming your team.",
-  },
-  {
-    q: "What if we don't have a faculty mentor yet?",
-    a: "Register with your preferred mentor's details after speaking to them. The innovation cell can help map a mentor to your theme if you're unsure.",
-  },
-  {
-    q: "Do we need a finished product to register?",
-    a: "No. Internal registration only needs a chosen problem statement and a credible approach. Build the prototype during the evaluation window.",
+    title: "1 faculty mentor",
+    body: "Every team must have one faculty mentor who guides the team and verifies the submission.",
+    tone: "text-primary",
+    bg: "bg-primary-soft",
   },
 ];
 
 export function EligibilitySection() {
   return (
     <section id="eligibility" className="section-pad relative">
-      <div className="shell grid gap-14 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">
-        <div className="lg:sticky lg:top-32">
-          <SectionHeading
-            eyebrow="Eligibility"
-            title={
-              <>
-                Check the basics <span className="text-gradient">before you register</span>
-              </>
-            }
-            description="Three rules cover almost every question. The details are in the accordion beside — expand what applies to you."
-          />
-          <div className="mt-10 space-y-3">
-            {cards.map((c, i) => (
-              <Reveal key={c.title} delay={i * 0.08}>
-                <div className="hover-lift flex gap-4 rounded-3xl border border-border bg-card p-5 shadow-soft">
-                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-accent text-brand-blue">
-                    <c.icon className="h-5 w-5" aria-hidden />
-                  </span>
-                  <div className="min-w-0">
-                    <h3 className="font-semibold">{c.title}</h3>
-                    <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{c.body}</p>
-                  </div>
-                </div>
-              </Reveal>
-            ))}
-          </div>
+      <div className="shell">
+        <SectionHeading
+          eyebrow="Eligibility"
+          title={
+            <>
+              Four rules decide <span className="text-gradient">if your team is valid</span>
+            </>
+          }
+          description="Teams that miss any of these are disqualified at verification. Check them before you register."
+          align="center"
+        />
+
+        <div className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {cards.map((c, i) => (
+            <Reveal key={c.title} delay={i * 0.08}>
+              <div className="hover-lift group relative flex h-full flex-col overflow-hidden rounded-3xl border border-border bg-card p-6 shadow-soft">
+                <div
+                  aria-hidden
+                  className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-primary/10 opacity-0 blur-2xl transition-opacity duration-500 group-hover:opacity-100"
+                />
+                <span className={`grid h-12 w-12 place-items-center rounded-2xl ${c.bg} ${c.tone}`}>
+                  <c.icon className="h-5 w-5" aria-hidden />
+                </span>
+                <h3 className="mt-5 font-display text-base font-semibold">{c.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{c.body}</p>
+              </div>
+            </Reveal>
+          ))}
         </div>
 
-        <Reveal className="rounded-4xl border border-border bg-card p-3 shadow-soft sm:p-6">
-          <Accordion type="single" collapsible className="w-full">
-            {faqs.map((f, i) => (
-              <AccordionItem key={f.q} value={`item-${i}`} className="border-border">
-                <AccordionTrigger className="text-left text-base font-medium hover:no-underline">
-                  <span className="flex items-start gap-3">
-                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-brand-green" aria-hidden />
-                    {f.q}
-                  </span>
-                </AccordionTrigger>
-                <AccordionContent className="pl-7 text-sm leading-relaxed text-muted-foreground">
-                  {f.a}
-                </AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
+        <Reveal delay={0.2} className="mt-10 flex flex-wrap items-center justify-center gap-3">
+          <Link to="/guidelines">
+            <MagneticButton className="border border-border bg-card/70 px-7 py-3.5 text-foreground hover:bg-accent">
+              <UserRound className="h-4 w-4 text-brand-blue" aria-hidden /> Read full guidelines
+            </MagneticButton>
+          </Link>
+          <Link to="/register">
+            <MagneticButton className="bg-primary px-7 py-3.5 text-primary-foreground shadow-glow hover:brightness-105">
+              Register your team
+            </MagneticButton>
+          </Link>
         </Reveal>
       </div>
     </section>
