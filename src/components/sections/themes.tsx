@@ -16,7 +16,7 @@ export function ThemesSection() {
           eyebrow="Themes"
           title={
             <>
-              Seventeen themes. <span className="text-gradient">Pick your battlefield.</span>
+              Eighteen themes. <span className="text-gradient">Pick your battlefield.</span>
             </>
           }
           description="Themes group the problem statements released by ministries and industry partners. Start from the domain your team already loves."
@@ -44,7 +44,7 @@ export function ThemesSection() {
             return (
               <motion.a
                 key={theme.id}
-                href="#problem-statements"
+                href="/problem-statements"
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-60px" }}
@@ -68,7 +68,7 @@ export function ThemesSection() {
                 <h3 className="mt-5 font-display text-base font-semibold">{theme.name}</h3>
                 <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{theme.blurb}</p>
                 <p className="mt-4 text-xs font-medium text-muted-foreground">
-                  {theme.statements} problem statements
+                  Explore statements
                 </p>
               </motion.a>
             );
