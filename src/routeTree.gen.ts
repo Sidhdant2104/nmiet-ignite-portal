@@ -10,6 +10,8 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as GuidelinesRouteImport } from './routes/guidelines'
+import { Route as ProblemStatementsRouteImport } from './routes/problem-statements'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as ApiAnnouncementsRouteImport } from './routes/api/announcements'
 import { Route as ApiProblemStatementsRouteImport } from './routes/api/problem-statements'
@@ -19,6 +21,16 @@ import { Route as ApiThemesRouteImport } from './routes/api/themes'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GuidelinesRoute = GuidelinesRouteImport.update({
+  id: '/guidelines',
+  path: '/guidelines',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProblemStatementsRoute = ProblemStatementsRouteImport.update({
+  id: '/problem-statements',
+  path: '/problem-statements',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RegisterRoute = RegisterRouteImport.update({
@@ -49,6 +61,8 @@ const ApiThemesRoute = ApiThemesRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/guidelines': typeof GuidelinesRoute
+  '/problem-statements': typeof ProblemStatementsRoute
   '/register': typeof RegisterRoute
   '/api/announcements': typeof ApiAnnouncementsRoute
   '/api/problem-statements': typeof ApiProblemStatementsRoute
@@ -57,6 +71,8 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/guidelines': typeof GuidelinesRoute
+  '/problem-statements': typeof ProblemStatementsRoute
   '/register': typeof RegisterRoute
   '/api/announcements': typeof ApiAnnouncementsRoute
   '/api/problem-statements': typeof ApiProblemStatementsRoute
@@ -66,6 +82,8 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/guidelines': typeof GuidelinesRoute
+  '/problem-statements': typeof ProblemStatementsRoute
   '/register': typeof RegisterRoute
   '/api/announcements': typeof ApiAnnouncementsRoute
   '/api/problem-statements': typeof ApiProblemStatementsRoute
@@ -76,6 +94,8 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/guidelines'
+    | '/problem-statements'
     | '/register'
     | '/api/announcements'
     | '/api/problem-statements'
@@ -84,6 +104,8 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/guidelines'
+    | '/problem-statements'
     | '/register'
     | '/api/announcements'
     | '/api/problem-statements'
@@ -92,6 +114,8 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/guidelines'
+    | '/problem-statements'
     | '/register'
     | '/api/announcements'
     | '/api/problem-statements'
@@ -101,6 +125,8 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  GuidelinesRoute: typeof GuidelinesRoute
+  ProblemStatementsRoute: typeof ProblemStatementsRoute
   RegisterRoute: typeof RegisterRoute
   ApiAnnouncementsRoute: typeof ApiAnnouncementsRoute
   ApiProblemStatementsRoute: typeof ApiProblemStatementsRoute
@@ -115,6 +141,20 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/guidelines': {
+      id: '/guidelines'
+      path: '/guidelines'
+      fullPath: '/guidelines'
+      preLoaderRoute: typeof GuidelinesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/problem-statements': {
+      id: '/problem-statements'
+      path: '/problem-statements'
+      fullPath: '/problem-statements'
+      preLoaderRoute: typeof ProblemStatementsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/register': {
@@ -157,6 +197,8 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  GuidelinesRoute: GuidelinesRoute,
+  ProblemStatementsRoute: ProblemStatementsRoute,
   RegisterRoute: RegisterRoute,
   ApiAnnouncementsRoute: ApiAnnouncementsRoute,
   ApiProblemStatementsRoute: ApiProblemStatementsRoute,
