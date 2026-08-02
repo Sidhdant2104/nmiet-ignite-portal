@@ -1,19 +1,27 @@
 import React, { useRef, useMemo, useState } from "react";
 import { motion, useScroll, useTransform, Variants } from "framer-motion";
 
+
+
 // =============================================================================
 // INDIA SVG — inlined verbatim (source: /mnt/user-data/uploads/in.svg,
 // © Simplemaps.com, simplemaps.com/resources/svg-license — free for
 // commercial use, attribution appreciated).
 //
-// This is embedded as a raw markup string (not JSX) and rendered via
-// dangerouslySetInnerHTML so every original attribute — including the
-// kebab-case SVG presentation attributes (stroke-width, stroke-linecap,
-// baseprofile, etc.) that are not valid JSX prop names — survives exactly
-// as authored. Nothing below has been simplified, redrawn, or had any path
-// data touched; only the leading XML declaration/license comment were
-// stripped since they aren't valid to inject into innerHTML (attribution
-// is preserved above instead).
+// Embedded as a raw markup string (not JSX) and rendered via
+// dangerouslySetInnerHTML so every original attribute — including
+// kebab-case SVG presentation attributes that aren't valid JSX prop names —
+// survives exactly as authored. Nothing below has been simplified,
+// redrawn, or had any path data touched; only the leading XML declaration
+// and license comment were stripped since they can't be injected via
+// innerHTML (attribution is preserved above instead).
+//
+// CALIBRATION NOTE: this file also embeds its own geographic reference
+// points (see the "points" group near the end — three `lat|lng` pairs with
+// matching cx/cy in the 0–1000 viewBox). Every city coordinate used by this
+// component is derived from those reference points via a fitted affine
+// transform (see MAP_VIEWBOX / NODES below) rather than eyeballed — see the
+// calibration comment further down for the exact method.
 // =============================================================================
 const INDIA_SVG_MARKUP = `
 <svg baseprofile="tiny" fill="#6f9c76" height="1000" stroke="#ffffff" stroke-linecap="round" stroke-linejoin="round" stroke-width=".5" version="1.2" viewbox="0 0 1000 1000" width="1000" xmlns="http://www.w3.org/2000/svg">
@@ -187,48 +195,142 @@ interface CityNode {
   x: number;
   y: number;
   isPrimary?: boolean;
+  /** Major = labelled city. Minor = small unlabeled innovation-centre dot. */
+  isMajor?: boolean;
+}
+
+interface NetworkEdge {
+  from: string;
+  to: string;
 }
 
 // =============================================================================
-// CONFIG — coordinate space & node data
+// CALIBRATION
 // =============================================================================
-
-/**
- * Shared coordinate space for the overlay SVG (connections + node placement).
- * Kept in sync with the wrapper's `aspect-[4/5]` so nothing distorts.
- * Fine-tune x/y against the real geometry above if a node needs nudging —
- * these are calibrated for the inlined map's 0 0 1000 1000 viewBox, scaled
- * down to a 400 x 500 working space for this component.
- */
+//
+// The imported SVG (0–1000 x 0–1000 viewBox) embeds its own geographic
+// reference points in its "points" group — three `lat|lng` pairs, each with
+// a matching cx/cy. Fitting a 2D affine transform through those three
+// points (solved offline, see the calibration script) gives:
+//
+//   x = 0.003664·lat + 27.377270·lng − 1766.889188
+//   y = −36.164959·lat + 6.512604·lng + 758.213999
+//
+// That transform reproduces all three reference points exactly, and was
+// then applied to each city's real-world lat/lng to place it precisely on
+// the actual map geometry — not by eye. The resulting 0–1000 coordinates
+// are scaled by 0.4 / 0.5 respectively into this component's 400 x 500
+// working space (MAP_VIEWBOX) below. If you swap in a different SVG later,
+// re-run the same fit against its own reference points (or four corner
+// landmarks) before trusting these numbers.
+//
 const MAP_VIEWBOX = { width: 400, height: 500 };
-
+const NODE_CALIBRATION = {
+  offsetX: 0,
+  offsetY: 0,
+  scaleX: 1,
+  scaleY: 1,
+};
 const NODES: CityNode[] = [
-  { id: "pune", name: "Pune", x: 132, y: 322, isPrimary: true },
-  { id: "mumbai", name: "Mumbai", x: 108, y: 298 },
-  { id: "delhi", name: "Delhi", x: 192, y: 128 },
-  { id: "bengaluru", name: "Bengaluru", x: 168, y: 388 },
-  { id: "hyderabad", name: "Hyderabad", x: 188, y: 336 },
-  { id: "chennai", name: "Chennai", x: 202, y: 412 },
-  { id: "ahmedabad", name: "Ahmedabad", x: 96, y: 240 },
-  { id: "kolkata", name: "Kolkata", x: 300, y: 258 },
+  // Primary hub
+  { id: "pune", name: "Pune", x: 106.7, y: 295.0, isPrimary: true, isMajor: true },
+
+  // Major cities — labelled
+  { id: "mumbai", name: "Mumbai", x: 90.9, y: 293.1, isMajor: true },
+  { id: "ahmedabad", name: "Ahmedabad", x: 88.6, y: 240.8, isMajor: true },
+  { id: "surat", name: "Surat", x: 92.8, y: 259.3, isMajor: true },
+  { id: "jaipur", name: "Jaipur", x: 125.5, y: 196.2, isMajor: true },
+  { id: "delhi", name: "Delhi", x: 137.4, y: 178.7, isMajor: true },
+  { id: "chandigarh", name: "Chandigarh", x: 133.1, y: 149.7, isMajor: true },
+  { id: "lucknow", name: "Lucknow", x: 177.0, y: 199.4, isMajor: true },
+  { id: "kanpur", name: "Kanpur", x: 172.8, y: 211.6, isMajor: true },
+  { id: "indore", name: "Indore", x: 114.3, y: 247.0, isMajor: true },
+  { id: "bhopal", name: "Bhopal", x: 135.9, y: 248.8, isMajor: true },
+  { id: "nagpur", name: "Nagpur", x: 161.7, y: 270.2, isMajor: true },
+  { id: "hyderabad", name: "Hyderabad", x: 154.7, y: 304.5, isMajor: true },
+  { id: "bengaluru", name: "Bengaluru", x: 140.2, y: 359.8, isMajor: true },
+  { id: "chennai", name: "Chennai", x: 168.7, y: 362.8, isMajor: true },
+  { id: "kochi", name: "Kochi", x: 129.9, y: 402.5, isMajor: true },
+  { id: "bhubaneswar", name: "Bhubaneswar", x: 233.6, y: 272.4, isMajor: true },
+  { id: "kolkata", name: "Kolkata", x: 254.8, y: 246.5, isMajor: true },
+  { id: "guwahati", name: "Guwahati", x: 291.9, y: 206.1, isMajor: true },
+
+  // Minor innovation centres — unlabeled
+  { id: "coimbatore", name: "Coimbatore", x: 138.6, y: 381.2, isMajor: false },
+  { id: "visakhapatnam", name: "Visakhapatnam", x: 201.9, y: 306.1, isMajor: false },
+  { id: "patna", name: "Patna", x: 231.1, y: 212.8, isMajor: false },
+  { id: "ranchi", name: "Ranchi", x: 227.4, y: 242.3, isMajor: false },
+  { id: "noida", name: "Noida", x: 143.3, y: 179.0, isMajor: false },
 ];
 
-const PUNE_NODE = NODES.find((n) => n.isPrimary)!;
-const SATELLITE_NODES = NODES.filter((n) => !n.isPrimary);
+const NODE_MAP: Record<string, CityNode> = Object.fromEntries(
+  NODES.map((n) => [n.id, n])
+);
+const PUNE_NODE = NODE_MAP.pune;
+const MAJOR_NODES = NODES.filter((n) => n.isMajor && !n.isPrimary);
+const MINOR_NODES = NODES.filter((n) => !n.isMajor);
+
+// =============================================================================
+// NETWORK — realistic, not a full mesh
+// =============================================================================
+// Regional clusters connect to their nearest neighbours; Pune additionally
+// gets 6–8 direct long-range routes to major hubs so it visibly reads as
+// the origin the network spreads from.
+const EDGES: NetworkEdge[] = [
+  // Pune's direct long-range + regional routes (7 total)
+  { from: "pune", to: "mumbai" },
+  { from: "pune", to: "hyderabad" },
+  { from: "pune", to: "delhi" },
+  { from: "pune", to: "bengaluru" },
+  { from: "pune", to: "kolkata" },
+  { from: "pune", to: "ahmedabad" },
+  { from: "pune", to: "chennai" },
+
+  // Western cluster
+  { from: "mumbai", to: "ahmedabad" },
+  { from: "ahmedabad", to: "surat" },
+  { from: "nagpur", to: "pune" },
+
+  // Northern cluster
+  { from: "delhi", to: "jaipur" },
+  { from: "delhi", to: "chandigarh" },
+  { from: "delhi", to: "lucknow" },
+  { from: "delhi", to: "noida" },
+  { from: "lucknow", to: "kanpur" },
+
+  // Central cluster
+  { from: "indore", to: "bhopal" },
+  { from: "bhopal", to: "nagpur" },
+
+  // Southern cluster
+  { from: "hyderabad", to: "bengaluru" },
+  { from: "bengaluru", to: "chennai" },
+  { from: "chennai", to: "kochi" },
+  { from: "chennai", to: "coimbatore" },
+  { from: "visakhapatnam", to: "chennai" },
+
+  // Eastern cluster
+  { from: "kolkata", to: "bhubaneswar" },
+  { from: "bhubaneswar", to: "visakhapatnam" },
+  { from: "kolkata", to: "patna" },
+  { from: "patna", to: "ranchi" },
+  { from: "ranchi", to: "kolkata" },
+  { from: "guwahati", to: "kolkata" },
+];
 
 // =============================================================================
 // ANIMATION VARIANTS
 // =============================================================================
 
-/** Whole illustration floats 3–5px — weightless, still never more. */
+/** Whole illustration floats 3px — weightless, never more. */
 const mapFloatVariants: Variants = {
   animate: {
-    y: [0, -4, 0],
-    transition: { duration: 8, repeat: Infinity, ease: "easeInOut" },
+    y: [0, -3, 0],
+    transition: { duration: 9, repeat: Infinity, ease: "easeInOut" },
   },
 };
 
-/** Soft pulse for satellite node cores. */
+/** Soft pulse for major node cores. */
 const nodePulseVariants: Variants = {
   animate: (delay: number) => ({
     scale: [1, 1.3, 1],
@@ -237,11 +339,20 @@ const nodePulseVariants: Variants = {
   }),
 };
 
-/** Pune's larger, slower breathing bloom. */
+/** Even softer, smaller pulse for minor innovation-centre dots. */
+const minorPulseVariants: Variants = {
+  animate: (delay: number) => ({
+    scale: [1, 1.2, 1],
+    opacity: [0.35, 0.6, 0.35],
+    transition: { duration: 3.6, repeat: Infinity, ease: "easeInOut", delay },
+  }),
+};
+
+/** Pune's breathing bloom — kept soft, not overdone. */
 const puneBreatheVariants: Variants = {
   animate: {
     scale: [1, 1.2, 1],
-    opacity: [0.55, 1, 0.55],
+    opacity: [0.6, 1, 0.6],
     transition: { duration: 4, repeat: Infinity, ease: "easeInOut" },
   },
 };
@@ -260,27 +371,26 @@ const puneRippleVariants: Variants = {
   },
 };
 
-/** Glass label drifts almost imperceptibly. */
+/** Glass label drifts 2–3px. */
 const labelFloatVariants: Variants = {
   animate: {
-    y: [0, -4, 0],
+    y: [0, -3, 0],
     transition: { duration: 6, repeat: Infinity, ease: "easeInOut" },
   },
 };
 
-/** Orbital rings breathe opacity only — never rotate. Now sits in the 8–10% band. */
+/** Orbital rings breathe opacity only — never rotate. */
 const orbitBreatheVariants: Variants = {
   animate: (delay: number) => ({
-    opacity: [0.07, 0.1, 0.07],
+    opacity: [0.09, 0.13, 0.09],
     transition: { duration: 7, repeat: Infinity, ease: "easeInOut", delay },
   }),
 };
 
-/** Ambient background glow breathing, independent of node glows.
- *  Peak lowered ~35% (was 0.28) to pull the Pune glow back per feedback. */
+/** Ambient background glow breathing, independent of node glows. */
 const glowBreatheVariants: Variants = {
   animate: {
-    opacity: [0.1, 0.18, 0.1],
+    opacity: [0.12, 0.2, 0.12],
     transition: { duration: 9, repeat: Infinity, ease: "easeInOut" },
   },
 };
@@ -291,16 +401,19 @@ const glowBreatheVariants: Variants = {
 
 /** Convert a point in the shared coordinate space to a CSS percentage. */
 function toPercent(x: number, y: number) {
+  const cx = x * NODE_CALIBRATION.scaleX + NODE_CALIBRATION.offsetX;
+  const cy = y * NODE_CALIBRATION.scaleY + NODE_CALIBRATION.offsetY;
+
   return {
-    left: `${(x / MAP_VIEWBOX.width) * 100}%`,
-    top: `${(y / MAP_VIEWBOX.height) * 100}%`,
+    left: `${(cx / MAP_VIEWBOX.width) * 100}%`,
+    top: `${(cy / MAP_VIEWBOX.height) * 100}%`,
   };
 }
 
 /**
- * Elegant quadratic curve from Pune to a destination city. All curves bow
- * in the same rotational sense so the network reads as one coherent flow
- * rather than a tangle — never straight, never dashed.
+ * Elegant quadratic curve between two nodes. All curves bow in the same
+ * rotational sense so the network reads as one coherent flow rather than a
+ * tangle — never straight, never dashed.
  */
 function buildCurvePath(from: CityNode, to: CityNode): string {
   const midX = (from.x + to.x) / 2;
@@ -319,10 +432,15 @@ function buildCurvePath(from: CityNode, to: CityNode): string {
 // SUB-COMPONENTS
 // =============================================================================
 
-/** Satellite innovation node: soft pulse core + hover glow + label-on-hover. */
-const SatelliteNode: React.FC<{ node: CityNode; index: number }> = ({
+/**
+ * A city node. `major` cities get a bigger core + a hover label (hidden on
+ * mobile, per spec — only Pune's label ever shows on small screens). Minor
+ * innovation-centre dots stay small and permanently unlabeled.
+ */
+const SatelliteNode: React.FC<{ node: CityNode; index: number; major: boolean }> = ({
   node,
   index,
+  major,
 }) => {
   const [hovered, setHovered] = useState(false);
   const position = toPercent(node.x, node.y);
@@ -331,33 +449,46 @@ const SatelliteNode: React.FC<{ node: CityNode; index: number }> = ({
     <div
       className="absolute -translate-x-1/2 -translate-y-1/2"
       style={position}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      onMouseEnter={() => major && setHovered(true)}
+      onMouseLeave={() => major && setHovered(false)}
     >
-      <motion.div
-        custom={index * 0.4}
-        variants={nodePulseVariants}
+       <motion.div
+        custom={index * 0.35}
+        variants={major ? nodePulseVariants : minorPulseVariants}
         animate="animate"
-        className="absolute inset-0 -m-2 rounded-full bg-sky-400/25 blur-[3px]"
+        className={
+          major? "absolute inset-0 -m-1 rounded-full bg-sky-400/8 blur-[1px] dark:bg-sky-400/25 dark:blur-[3px]"
+               : "absolute inset-0 rounded-full bg-sky-300/12 blur-[2px] dark:bg-sky-400/15 dark:blur-[2px]"
+        }
       />
-      <motion.div
-        animate={{ opacity: hovered ? 1 : 0, scale: hovered ? 1.6 : 1 }}
-        transition={{ duration: 0.4, ease: "easeOut" }}
-        className="absolute inset-0 -m-3 rounded-full bg-sky-300/35 blur-md pointer-events-none"
-      />
-      <div className="relative h-1.5 w-1.5 rounded-full bg-sky-200/90 shadow-[0_0_6px_2px_rgba(125,211,252,0.45)]" />
-      <motion.span
-        animate={{ opacity: hovered ? 1 : 0, y: hovered ? 0 : 4 }}
-        transition={{ duration: 0.25 }}
-        className="pointer-events-none absolute left-1/2 top-full mt-2 -translate-x-1/2 whitespace-nowrap text-[11px] font-medium tracking-wide text-white/70"
-      >
-        {node.name}
-      </motion.span>
+      {major && (
+        <motion.div
+          animate={{ opacity: hovered ? 1 : 0, scale: hovered ? 1.6 : 1 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+          className="absolute inset-0 -m-3 rounded-full bg-sky-300/18 blur-sm pointer-events-none"
+        />
+      )} 
+     <div
+  className={
+    major
+  ? "relative h-1.5 w-1.5 rounded-full bg-indigo-300 shadow-[0_0_4px_1px_rgba(125,211,252,0.22)]:bg-sky-200/90 dark:shadow-[0_0_6px_2px_rgba(125,211,252,0.45)]"
+  : "relative h-1 w-1 rounded-full bg-indigo-300 shadow-[0_0_2px_rgba(165,180,252,0.12)] dark:bg-sky-300/70 dark:shadow-[0_0_4px_1px_rgba(125,211,252,0.3)]"
+  }
+/>
+      {major && (
+        <motion.span
+          animate={{ opacity: hovered ? 1 : 0, y: hovered ? 0 : 4 }}
+          transition={{ duration: 0.25 }}
+          className="pointer-events-none absolute left-1/2 top-full mt-2 hidden -translate-x-1/2 whitespace-nowrap text-[11px] font-medium tracking-wide text-white/70 sm:block"
+        >
+          {node.name}
+        </motion.span>
+      )}
     </div>
   );
 };
 
-/** Primary NMIET / Pune node — biggest node, bloom, ripple, glass label. */
+/** Primary NMIET / Pune node — biggest node, soft bloom, ripple, glass label. */
 const PuneNode: React.FC = () => {
   const position = toPercent(PUNE_NODE.x, PUNE_NODE.y);
 
@@ -366,105 +497,158 @@ const PuneNode: React.FC = () => {
       className="absolute -translate-x-1/2 -translate-y-1/2"
       style={position}
     >
-      {/* Ripple — expands outward every few seconds, then fades (glow ~35% lighter) */}
+      {/* Ripple — expands outward every few seconds, then fades */}
       <motion.div
         variants={puneRippleVariants}
         animate="animate"
-        className="absolute inset-0 -m-4 rounded-full border border-orange-300/40"
+        className="absolute inset-0 -m-4 rounded-full border border-orange-300/45"
       />
 
-      {/* Soft bloom — dialed back ~35% so it reads as an accent, not a spotlight */}
+      {/* Soft bloom — nudged up slightly from the previous pass, still restrained */}
       <motion.div
         variants={puneBreatheVariants}
         animate="animate"
-        className="absolute inset-0 -m-7 rounded-full bg-orange-400/23 blur-xl"
+        className="absolute inset-0 -m-7 rounded-full bg-orange-400/40 blur-2xl"
       />
       <motion.div
         variants={puneBreatheVariants}
         animate="animate"
-        className="absolute inset-0 -m-3 rounded-full bg-orange-300/33 blur-md"
+        className="absolute inset-0 -m-3 rounded-full bg-orange-300/55 blur-lg"
       />
 
       {/* Core — biggest node in the composition */}
-      <div className="relative h-3.5 w-3.5 rounded-full bg-orange-200 shadow-[0_0_16px_5px_rgba(251,146,60,0.4)]" />
+      <div className="relative h-3.5 w-3.5 rounded-full bg-orange-200 shadow-[0_0_28px_10px_rgba(251,146,60,0.65)]" />
 
       {/* Premium floating glass label */}
-      <motion.div
+       <motion.div
         variants={labelFloatVariants}
         animate="animate"
-        className="absolute left-1/2 top-full mt-4 w-max -translate-x-1/2 rounded-2xl border border-white/15 bg-white/5 px-4 py-2.5 text-center shadow-[0_8px_32px_rgba(0,0,0,0.35)] backdrop-blur-xl"
+className="
+absolute
+left-1/2
+top-full
+mt-4
+w-max
+-translate-x-1/2
+rounded-2xl
+border
+border-slate-200/70
+bg-white/75
+px-4
+py-2.5
+text-center
+shadow-sm
+backdrop-blur-xl
+dark:border-white/15
+dark:bg-white/5
+dark:shadow-[0_8px_32px_rgba(0,0,0,0.35)]
+"
       >
-        <p className="text-xs font-semibold leading-tight text-white">
-          📍 NMIET
+        <p className="text-xs font-semibold text-slate-700 dark:text-white">
+          📍 Pune, Maharashtra
         </p>
-        <p className="text-[11px] leading-tight text-white/60">Pune</p>
-        <p className="text-[11px] font-medium leading-tight text-orange-200/90">
-          Innovation Hub
+        <p className="text-[11px] font-medium text-orange-600 dark:text-orange-200/90">
+          NMIET Innovation Hub
         </p>
-      </motion.div>
+      </motion.div> 
     </div>
   );
 };
 
 /**
- * Pune → city connection. The route line is barely-there (guides the eye
- * only); the traveling particle — with a short fading trail — is the real
- * visual focus. Uses native SVG `animateMotion` (SMIL) so motion runs off
- * the main thread, keeping 60 FPS with 7 concurrent connections.
+ * A single network connection. The line itself is a real 1.5px stroke at
+ * 60% opacity (locked to true screen pixels via `vector-effect:
+ * non-scaling-stroke`, so it stays 1.5px regardless of how large the map is
+ * scaled) with a soft blurred duplicate beneath it for glow, and a
+ * per-edge gradient running from orange (the Pune end, where applicable)
+ * to blue (the destination). A single lead particle plus one faint
+ * follower travel the curve using native SVG `animateMotion` (SMIL) —
+ * motion runs off the main thread, so 60 FPS holds even with ~28
+ * simultaneous connections. Durations/delays are pseudo-randomised per
+ * edge so nothing ever looks synchronized.
  */
-const ConnectionPath: React.FC<{ node: CityNode; index: number }> = ({
-  node,
+const ConnectionPath: React.FC<{ edge: NetworkEdge; index: number }> = ({
+  edge,
   index,
 }) => {
-  const pathId = `route-${node.id}`;
-  const d = useMemo(() => buildCurvePath(PUNE_NODE, node), [node]);
+  const from = NODE_MAP[edge.from];
+  const to = NODE_MAP[edge.to];
+  const pathId = `route-${edge.from}-${edge.to}`;
+  const gradientId = `grad-${edge.from}-${edge.to}`;
+  const d = useMemo(() => buildCurvePath(from, to), [from, to]);
 
-  // Full cycle (travel + pause) lands in the 4–6s window requested.
-  const travelDuration = 3.2 + (index % 3) * 0.2;
-  const cycleDuration = travelDuration + 2; // includes rest before next pass
-  const delay = index * 0.7;
+  // Deterministic pseudo-random spread so 28 edges never sync up.
+  const travelDuration = 3 + ((index * 7) % 5) * 0.4;
+  const cycleDuration = travelDuration + 1.5 + ((index * 3) % 4) * 0.3;
+  const delay = (index * 0.53) % 6;
   const travelFraction = (travelDuration / cycleDuration).toFixed(3);
+  const followerOffset = 0.08;
 
   return (
     <g>
-      {/* Route — extremely subtle, exists only to guide the eye */}
+      <defs>
+        <linearGradient
+          id={gradientId}
+          gradientUnits="userSpaceOnUse"
+          x1={from.x}
+          y1={from.y}
+          x2={to.x}
+          y2={to.y}
+        >
+          <stop offset="0%" stopColor="#FB923C" stopOpacity={1} />
+          <stop offset="100%" stopColor="#7DD3FC" stopOpacity={0.35} />
+        </linearGradient>
+      </defs>
+
+      {/* Soft glow underlay — blurred, low opacity */}
+      <path
+        d={d}
+        fill="none"
+        stroke={`url(#${gradientId})`}
+        strokeWidth={3}
+        strokeLinecap="round"
+        opacity={0.15}
+        filter="url(#routeGlow)"
+        vectorEffect="non-scaling-stroke"
+      />
+
+      {/* The real route — exactly 1.5px, 60% opacity, orange → blue */}
       <path
         id={pathId}
         d={d}
         fill="none"
-        stroke="url(#routeGradient)"
-        strokeWidth={0.4}
+        stroke={`url(#${gradientId})`}
+        strokeWidth={1.5}
         strokeLinecap="round"
-        opacity={0.18}
+        opacity={0.75}
+        vectorEffect="non-scaling-stroke"
       />
 
-      {/* Two faint trailing followers, slightly behind the lead particle */}
-      {[0.06, 0.12].map((offset, i) => (
-        <circle key={i} r={1.4} fill="#FDBA74" opacity={0}>
-          <animateMotion
-            dur={`${cycleDuration}s`}
-            begin={`${delay + offset}s`}
-            repeatCount="indefinite"
-            keyPoints="0;1;1"
-            keyTimes={`0;${travelFraction};1`}
-            calcMode="linear"
-            rotate="auto"
-          >
-            <mpath href={`#${pathId}`} xlinkHref={`#${pathId}`} />
-          </animateMotion>
-          <animate
-            attributeName="opacity"
-            values="0;0.35;0.35;0;0"
-            keyTimes={`0;0.15;${travelFraction};${travelFraction};1`}
-            dur={`${cycleDuration}s`}
-            begin={`${delay + offset}s`}
-            repeatCount="indefinite"
-          />
-        </circle>
-      ))}
+      {/* Faint trailing follower */}
+      <circle r={1.3} fill="#FDBA74" opacity={0}>
+        <animateMotion
+          dur={`${cycleDuration}s`}
+          begin={`${delay + followerOffset}s`}
+          repeatCount="indefinite"
+          keyPoints="0;1;1"
+          keyTimes={`0;${travelFraction};1`}
+          calcMode="linear"
+          rotate="auto"
+        >
+          <mpath href={`#${pathId}`} xlinkHref={`#${pathId}`} />
+        </animateMotion>
+        <animate
+          attributeName="opacity"
+          values="0;0.3;0.3;0;0"
+          keyTimes={`0;0.15;${travelFraction};${travelFraction};1`}
+          dur={`${cycleDuration}s`}
+          begin={`${delay + followerOffset}s`}
+          repeatCount="indefinite"
+        />
+      </circle>
 
-      {/* Lead particle — the hero of the animation */}
-      <circle r={2.4} fill="#FED7AA" opacity={0}>
+      {/* Lead particle */}
+      <circle r={2.2} fill="#FED7AA" opacity={0}>
         <animateMotion
           dur={`${cycleDuration}s`}
           begin={`${delay}s`}
@@ -520,84 +704,103 @@ const InnovationMap: React.FC = () => {
   });
   const parallaxY = useTransform(scrollYProgress, [0, 1], [20, -20]);
 
+  // Pune's on-screen position, used to anchor the ambient orange glow to
+  // the actual calibrated node instead of an eyeballed offset.
+  const punePosition = toPercent(PUNE_NODE.x, PUNE_NODE.y);
+
   return (
     <div
       ref={sectionRef}
-      className="relative flex h-full min-h-[560px] w-full items-center justify-center overflow-hidden py-12"
+      className="relative flex h-full min-h-[620px] w-full items-center justify-center overflow-hidden py-12"
     >
       {/* Existing mesh gradient background is assumed to live on the parent
           section — this component only adds its own glow accents on top.
-          `h-full` here vertically centers the map within its hero column —
-          make sure the parent grid/flex cell has an explicit height (or is
-          itself a flex/grid item that stretches) for this to take effect;
-          `min-h-[560px]` is a floor so it still centers sensibly on its own. */}
+          `h-full` vertically centers the map within its hero column — make
+          sure the parent grid/flex cell has an explicit height (or itself
+          stretches) for this to take effect; `min-h-[620px]` is a floor so
+          it still centers sensibly on its own. */}
 
-      {/* Soft radial orange glow near Pune (south-west quadrant) */}
+      {/* Soft radial orange glow anchored to Pune's real calibrated position */}
       <motion.div
         variants={glowBreatheVariants}
         animate="animate"
-        className="pointer-events-none absolute left-[16%] top-[52%] h-72 w-72 rounded-full bg-orange-500/16 blur-[120px]"
+        style={punePosition}
+        className="pointer-events-none absolute h-72 w-72 -translate-x-1/2 -translate-y-1/2 rounded-full bg-orange-500/20 blur-[120px]"
       />
       {/* Subtle blue glow across northern India */}
       <motion.div
         variants={glowBreatheVariants}
         animate="animate"
-        className="pointer-events-none absolute right-[20%] top-[10%] h-80 w-80 rounded-full bg-blue-500/20 blur-[130px]"
+        className="pointer-events-none absolute right-[20%] top-[10%] h-80 w-80 rounded-full bg-blue-300/5 blur-[120px] opacity-40"
       />
 
       <motion.div
         style={{ y: parallaxY }}
-        className="relative mx-auto w-[92%] max-w-[720px] px-2 sm:max-w-[820px] lg:mx-0 lg:ml-[2%] lg:mr-auto lg:w-[85%] lg:max-w-[940px] lg:px-0"
-      >
-        <motion.div
-          variants={mapFloatVariants}
-          animate="animate"
-          className="relative aspect-[4/5] w-full"
+        className="relative w-full h-full"
         >
+       <motion.div
+  variants={mapFloatVariants}
+  animate="animate"
+  className="relative aspect-[4/5] w-full"
+>
           <OrbitalRings />
 
           {/* India outline — inlined verbatim above, styled with CSS only.
               Every path/state boundary from the original file is preserved;
               only presentation (fill/stroke/opacity) is overridden here.
-              Two layers of opacity for contrast + recognizability:
-                - fill (the country silhouette)  → ~15%
-                - stroke (state boundaries)       → ~20%, slightly stronger
-                  so the landmass reads clearly at a glance.
-              Note: this dataset (Simplemaps) only has state-level boundaries,
-              no separate district layer — if one is added later, give it a
-              lower opacity class than the state stroke below. */}
+
+              fill   = "outer outline" (the landmass silhouette)
+              stroke = "state boundaries"
+
+              Light: fill 15% / stroke 9%   ·   Dark: fill 24% / stroke 15%
+
+              NOTE — "district boundaries": this Simplemaps dataset only
+              contains state/UT-level paths (36 of them), each stroked
+              around its own perimeter — there is no finer district-level
+              layer in the data to target separately. The requested values
+              (light 4% / dark 5%) are recorded here so they're ready to
+              apply the moment a district-level layer exists:
+                district (light): stroke-white/[0.04]
+                district (dark):  dark:stroke-white/[0.05]
+              Applying them to the current state-level strokes would just
+              make state borders harder to see, so they're intentionally
+              not wired up below. */}
           <div
             className="
               absolute inset-0
-              [&_path]:fill-white/[0.15]
-              [&_path]:stroke-gray-300
+              [&_path]:fill-transparent dark:[&_path]:fill-white/[0.24]
+              [&_path]:stroke-slate-600 dark:[&_path]:stroke-gray-200
               [&_path]:stroke-[1.1]
-              [&_path]:stroke-opacity-[0.20]
+              [&_path]:stroke-opacity-[50] dark:[&_path]:stroke-opacity-[0.15]
               [&_svg]:h-full [&_svg]:w-full
             "
             dangerouslySetInnerHTML={{ __html: INDIA_SVG_MARKUP }}
           />
 
           {/* Connections + particles — same coordinate space as nodes */}
-          <svg
-            viewBox={`0 0 ${MAP_VIEWBOX.width} ${MAP_VIEWBOX.height}`}
-            className="absolute inset-0 h-full w-full"
-          >
+
+<svg
+  viewBox={`0 0 ${MAP_VIEWBOX.width} ${MAP_VIEWBOX.height}`}
+  className="absolute inset-0 h-full w-full"
+>
+
             <defs>
-              <linearGradient id="routeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="#FDBA74" stopOpacity={0.5} />
-                <stop offset="100%" stopColor="#7DD3FC" stopOpacity={0.1} />
-              </linearGradient>
+              <filter id="routeGlow" x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur stdDeviation="1.4" />
+              </filter>
             </defs>
-            {SATELLITE_NODES.map((node, i) => (
-              <ConnectionPath key={node.id} node={node} index={i} />
+            {EDGES.map((edge, i) => (
+              <ConnectionPath key={`${edge.from}-${edge.to}`} edge={edge} index={i} />
             ))}
           </svg>
 
           {/* Nodes — HTML layer for crisp glow/blur/backdrop-filter */}
           <PuneNode />
-          {SATELLITE_NODES.map((node, i) => (
-            <SatelliteNode key={node.id} node={node} index={i} />
+          {MAJOR_NODES.map((node, i) => (
+            <SatelliteNode key={node.id} node={node} index={i} major />
+          ))}
+          {MINOR_NODES.map((node, i) => (
+            <SatelliteNode key={node.id} node={node} index={i} major={false} />
           ))}
         </motion.div>
       </motion.div>

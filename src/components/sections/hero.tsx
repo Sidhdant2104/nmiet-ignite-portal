@@ -187,7 +187,8 @@ function HeroVisual() {
             d="M151 29 172 39 184 59 205 70 213 91 237 99 249 120 271 130 264 148 276 161 253 170 246 193 229 211 225 244 208 264 203 302 185 325 168 300 153 291 144 266 126 248 119 223 105 204 100 176 112 160 108 135 121 119 119 94 132 79 130 57 Z"
             fill="none"
             stroke="var(--color-border)"
-            strokeWidth="1"
+            strokeWidth={1}
+            opacity={0.22}
             strokeLinejoin="round"
             initial={{ pathLength: 0, opacity: 0 }}
             animate={{ pathLength: 1, opacity: 0.15 }}
