@@ -7,9 +7,11 @@ export function Footer() {
       <div className="shell grid gap-10 py-14 md:grid-cols-[1.4fr_1fr_1fr]">
         <div>
           <div className="flex items-center gap-3">
-            <span className="grid h-10 w-10 place-items-center rounded-xl bg-primary text-sm font-bold text-primary-foreground">
-              N
-            </span>
+              <img
+                src="/logos/nmiet-logo.png"
+                alt="NMIET"
+                className="h-8 w-auto object-contain sm:h-10 md:h-12"
+              />
             <span className="font-display text-sm font-semibold">NMIET SIH Portal</span>
           </div>
           <p className="mt-4 max-w-sm text-sm leading-relaxed text-muted-foreground">
