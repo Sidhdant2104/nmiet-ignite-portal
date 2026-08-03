@@ -1,191 +1,109 @@
 import { motion } from "framer-motion";
-import type { ComponentType } from "react";
-import { LeadPortrait } from "@/components/organizing-committee/portrait";
-import type { OperationalTeam, SectionLayout } from "@/components/organizing-committee/team-data";
-import { coreTeamPlaceholder, operationalTeams } from "@/components/organizing-committee/team-data";
-import { cn } from "@/lib/utils";
+import { Portrait } from "@/components/organizing-committee/portrait";
+import { TeamCreditsBlock } from "@/components/organizing-committee/team-credits";
+import type { OperationalTeam, TeamPerson } from "@/components/organizing-committee/team-data";
+import { operationalTeams } from "@/components/organizing-committee/team-data";
 
 const ease = [0.22, 1, 0.36, 1] as const;
 
 function TeamIcon({ team }: { team: OperationalTeam }) {
   const Icon = team.icon;
+
   return (
     <span
-      className="grid h-16 w-16 place-items-center rounded-2xl backdrop-blur sm:h-20 sm:w-20"
-      style={{
-        background: team.accent.glow,
-        color: team.accent.accent,
-      }}
+      className="grid h-14 w-14 place-items-center rounded-2xl border border-white/20 shadow-sm backdrop-blur sm:h-16 sm:w-16"
+      style={{ background: team.accent.glow, color: team.accent.accent }}
     >
-      <Icon className="h-8 w-8 sm:h-9 sm:w-9" strokeWidth={1.5} />
+      <Icon className="h-7 w-7 sm:h-8 sm:w-8" strokeWidth={1.6} />
     </span>
   );
 }
 
-function LeftLayout({ team }: { team: OperationalTeam }) {
+function LeaderCard({ person, label, team }: { person: TeamPerson; label: string; team: OperationalTeam }) {
   return (
-    <div className="grid items-center gap-12 lg:grid-cols-[1fr_1.2fr] lg:gap-20 max-md:gap-7">
-      <motion.div
-        initial={{ opacity: 0, x: -40 }}
-        whileInView={{ opacity: 1, x: 0 }}
-        viewport={{ once: true, margin: "-80px" }}
-        transition={{ duration: 0.85, ease }}
-        className="flex flex-wrap items-end gap-8 sm:gap-12 max-md:justify-center max-md:gap-5"
-      >
-        <LeadPortrait name={team.lead.name} photo={team.lead.photo} label="Lead" />
-        {team.coLead ? (
-          <LeadPortrait name={team.coLead.name} photo={team.coLead.photo} label="Co-Lead" />
-        ) : null}
-      </motion.div>
-
-      <motion.div
-        initial={{ opacity: 0, y: 40 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, margin: "-80px" }}
-        transition={{ duration: 0.85, delay: 0.08, ease }}
-      >
-        <TeamIcon team={team} />
-        <h3 className="mt-8 font-display text-3xl font-semibold tracking-tight sm:text-4xl lg:text-[2.75rem] max-md:mt-5 max-md:text-2xl">
-          {team.domain}
-        </h3>
-        <p className="mt-6 font-display text-xl italic leading-relaxed text-muted-foreground sm:text-2xl max-md:mt-3 max-md:text-lg">
-          &ldquo;{team.mission}&rdquo;
-        </p>
-        <p className="mt-10 text-sm leading-relaxed text-muted-foreground/80 max-md:mt-5">{coreTeamPlaceholder}</p>
-      </motion.div>
-    </div>
-  );
-}
-
-function RightLayout({ team }: { team: OperationalTeam }) {
-  return (
-    <div className="grid items-center gap-12 lg:grid-cols-[1.2fr_1fr] lg:gap-20 max-md:gap-7">
-      <motion.div
-        initial={{ opacity: 0, y: 40 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, margin: "-80px" }}
-        transition={{ duration: 0.85, ease }}
-        className="lg:text-right max-md:text-center"
-      >
-        <div className="lg:flex lg:justify-end">
-          <TeamIcon team={team} />
-        </div>
-        <h3 className="mt-8 font-display text-3xl font-semibold tracking-tight sm:text-4xl lg:text-[2.75rem] max-md:mt-5 max-md:text-2xl">
-          {team.domain}
-        </h3>
-        <p className="mt-6 font-display text-xl italic leading-relaxed text-muted-foreground sm:text-2xl max-md:mt-3 max-md:text-lg">
-          &ldquo;{team.mission}&rdquo;
-        </p>
-        <p className="mt-10 text-sm leading-relaxed text-muted-foreground/80 max-md:mt-5">{coreTeamPlaceholder}</p>
-      </motion.div>
-
-      <motion.div
-        initial={{ opacity: 0, x: 40 }}
-        whileInView={{ opacity: 1, x: 0 }}
-        viewport={{ once: true, margin: "-80px" }}
-        transition={{ duration: 0.85, delay: 0.08, ease }}
-        className="flex flex-wrap items-end justify-start gap-8 sm:gap-12 lg:justify-end max-md:justify-center max-md:gap-5"
-      >
-        <LeadPortrait name={team.lead.name} photo={team.lead.photo} label="Lead" />
-        {team.coLead ? (
-          <LeadPortrait name={team.coLead.name} photo={team.coLead.photo} label="Co-Lead" />
-        ) : null}
-      </motion.div>
-    </div>
-  );
-}
-
-function CenterLayout({ team }: { team: OperationalTeam }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 48 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-80px" }}
-      transition={{ duration: 0.9, ease }}
-      className="mx-auto max-w-3xl text-center"
-    >
-      <div className="flex justify-center">
-        <TeamIcon team={team} />
-      </div>
-      <h3 className="mt-8 font-display text-3xl font-semibold tracking-tight sm:text-4xl lg:text-[2.75rem] max-md:mt-5 max-md:text-2xl">
-        {team.domain}
-      </h3>
-      <p className="mt-6 font-display text-xl italic leading-relaxed text-muted-foreground sm:text-2xl max-md:mt-3 max-md:text-lg">
-        &ldquo;{team.mission}&rdquo;
-      </p>
-
-      <div className="mt-14 flex flex-wrap items-start justify-center gap-10 sm:gap-16 max-md:mt-7 max-md:gap-5">
-        <LeadPortrait name={team.lead.name} photo={team.lead.photo} label="Lead" />
-        {team.coLead ? (
-          <LeadPortrait name={team.coLead.name} photo={team.coLead.photo} label="Co-Lead" />
-        ) : null}
-      </div>
-
-      <p className="mt-14 text-sm leading-relaxed text-muted-foreground/80 max-md:mt-6">{coreTeamPlaceholder}</p>
-    </motion.div>
-  );
-}
-
-const layoutComponents: Record<SectionLayout, ComponentType<{ team: OperationalTeam }>> = {
-  left: LeftLayout,
-  right: RightLayout,
-  center: CenterLayout,
-};
-
-function TeamStory({ team }: { team: OperationalTeam }) {
-  const Layout = layoutComponents[team.layout];
-
-  return (
-    <section className="relative flex min-h-[85svh] items-center py-24 sm:py-32 max-md:min-h-0 max-md:py-14">
-      {/* Accent glow */}
+    <article className="group relative flex min-w-0 flex-col items-center overflow-hidden rounded-[1.65rem] border border-border/60 bg-background/45 px-5 py-8 text-center shadow-[0_12px_32px_oklch(0.2_0.02_260_/_6%)] transition-[transform,box-shadow,border-color] duration-300 hover:-translate-y-1 hover:border-border hover:shadow-lift sm:px-8 sm:py-9">
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 overflow-hidden"
+        className="pointer-events-none absolute inset-x-10 top-0 h-px opacity-80"
+        style={{ background: team.accent.accent }}
+      />
+      <motion.div
+        className="mx-auto w-fit"
+        animate={{ y: [0, -3, 0] }}
+        transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
       >
-        <div
-          className={cn(
-            "absolute top-1/2 h-[28rem] w-[28rem] -translate-y-1/2 rounded-full blur-[130px]",
-            team.layout === "left" && "left-0 -translate-x-1/3",
-            team.layout === "right" && "right-0 translate-x-1/3",
-            team.layout === "center" && "left-1/2 -translate-x-1/2",
-          )}
-          style={{ background: team.accent.glow }}
-        />
-      </div>
+        <Portrait name={person.name} photo={person.photo} size="xl" glowColor={team.accent.glow} />
+      </motion.div>
+      <h4 className="mt-6 font-display text-xl font-semibold tracking-tight sm:text-2xl">{person.name}</h4>
+      <p className="mt-2 text-[0.65rem] font-semibold uppercase tracking-[0.2em]" style={{ color: team.accent.accent }}>
+        {label}
+      </p>
+      {person.department ? <p className="mt-4 max-w-[18rem] text-sm leading-relaxed text-muted-foreground">{person.department}</p> : null}
+      {person.year ? <p className="mt-1 text-sm text-muted-foreground/80">{person.year}</p> : null}
+    </article>
+  );
+}
 
-      <div className="shell relative w-full">
-        <Layout team={team} />
+function OperationalDomainCard({ team }: { team: OperationalTeam }) {
+  return (
+    <motion.article
+      initial={{ opacity: 0, y: 24 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-60px" }}
+      transition={{ duration: 0.42, ease }}
+      whileHover={{ y: -4 }}
+      className="group relative mx-auto w-full max-w-4xl overflow-hidden rounded-[2rem] border border-border/70 bg-card/65 p-1 shadow-soft backdrop-blur-xl transition-[transform,box-shadow] duration-300 hover:shadow-lift sm:rounded-[2.5rem]"
+    >
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 opacity-70"
+        style={{ background: `linear-gradient(135deg, ${team.accent.glow}, transparent 42%, ${team.accent.glow})` }}
+      />
+      <div className="relative rounded-[1.8rem] border border-white/25 bg-background/35 px-5 py-8 sm:rounded-[2.3rem] sm:px-10 sm:py-11">
+        <header className="mx-auto flex max-w-xl flex-col items-center text-center">
+          <TeamIcon team={team} />
+          <h3 className="mt-5 font-display text-3xl font-semibold tracking-tight sm:text-4xl">{team.domain}</h3>
+          <p className="mt-3 max-w-lg font-display text-lg italic leading-relaxed text-muted-foreground sm:text-xl">
+            &ldquo;{team.mission}&rdquo;
+          </p>
+          <p className="mt-3 max-w-md text-sm leading-relaxed text-muted-foreground/85">{team.description}</p>
+        </header>
+
+        <div className={`mx-auto mt-8 grid w-full gap-4 ${team.coLead ? "max-w-3xl sm:grid-cols-2" : "max-w-md"}`}>
+          <LeaderCard person={team.lead} label="Lead" team={team} />
+          {team.coLead ? <LeaderCard person={team.coLead} label="Co-Lead" team={team} /> : null}
+        </div>
+
+        <TeamCreditsBlock accentColor={team.accent.accent} className="mx-auto mt-4 max-w-3xl sm:mt-5" />
       </div>
-    </section>
+    </motion.article>
   );
 }
 
 export function OperationalSection() {
   return (
-    <div className="relative border-t border-border/40">
-      <div className="shell py-20 sm:py-28 max-md:py-14">
+    <section className="relative border-t border-border/40 py-14 sm:py-20">
+      <div className="shell">
         <motion.div
-          initial={{ opacity: 0, y: 32 }}
+          initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-60px" }}
-          transition={{ duration: 0.8, ease }}
-          className="max-w-2xl"
+          transition={{ duration: 0.42, ease }}
+          className="mx-auto max-w-2xl text-center"
         >
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-            Operational Teams
-          </p>
-          <h2 className="mt-4 font-display text-3xl font-semibold tracking-tight sm:text-4xl">
-            Every domain. One mission.
-          </h2>
-          <p className="mt-5 text-lg text-muted-foreground">
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">Operational Teams</p>
+          <h2 className="mt-4 font-display text-3xl font-semibold tracking-tight sm:text-4xl">Every domain. One mission.</h2>
+          <p className="mt-4 text-base leading-relaxed text-muted-foreground sm:text-lg">
             Nine dedicated teams working behind the scenes to make SIH 2026 unforgettable.
           </p>
         </motion.div>
-      </div>
 
-      {operationalTeams.map((team) => (
-        <TeamStory key={team.id} team={team} />
-      ))}
-    </div>
+        <div className="mt-10 space-y-8 sm:mt-14 sm:space-y-10">
+          {operationalTeams.map((team) => (
+            <OperationalDomainCard key={team.id} team={team} />
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }

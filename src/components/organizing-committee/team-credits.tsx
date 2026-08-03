@@ -25,14 +25,14 @@ export function TeamCreditsBlock({
       viewport={{ once: true, margin: "-40px" }}
       transition={{ duration: 0.65, delay: 0.12, ease }}
       className={cn(
-        "relative overflow-hidden rounded-2xl border border-border/70 bg-card/50 p-6 backdrop-blur sm:p-7",
+        "relative overflow-hidden rounded-[1.65rem] border border-border/60 bg-background/40 p-5 shadow-[0_10px_30px_oklch(0.2_0.02_260_/_5%)] backdrop-blur sm:p-7",
         className,
       )}
     >
       <div
         aria-hidden
-        className="pointer-events-none absolute -right-10 -top-10 h-36 w-36 rounded-full blur-3xl"
-        style={{ background: accentColor ? `${accentColor}20` : "var(--color-primary-soft)" }}
+        className="pointer-events-none absolute -right-10 -top-10 h-36 w-36 rounded-full opacity-15 blur-3xl"
+        style={{ background: accentColor ?? "var(--color-primary-soft)" }}
       />
 
       <div className="relative space-y-5">
@@ -40,7 +40,7 @@ export function TeamCreditsBlock({
           <span
             className="grid h-9 w-9 place-items-center rounded-xl"
             style={{
-              background: accentColor ? `${accentColor}18` : "var(--color-primary-soft)",
+              background: accentColor ? `color-mix(in oklab, ${accentColor} 14%, transparent)` : "var(--color-primary-soft)",
               color: accentColor ?? "var(--color-primary)",
             }}
           >
@@ -51,17 +51,17 @@ export function TeamCreditsBlock({
           </h5>
         </div>
 
-        <div className="space-y-1 text-sm leading-relaxed text-muted-foreground">
+        <div className="max-w-2xl space-y-1 text-sm leading-relaxed text-muted-foreground">
           {introLines.map((line) => (
             <p key={line}>{line}</p>
           ))}
         </div>
 
-        <div>
+        <div className="rounded-2xl border border-border/50 bg-background/30 p-4 sm:p-5">
           <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
-            This section will later display
+            Future team members
           </p>
-          <ul className="mt-3 space-y-2.5">
+          <ul className="mt-3 grid gap-2.5 sm:grid-cols-2">
             {TEAM_CREDIT_CATEGORIES.map((category) => (
               <li key={category} className="flex items-center gap-3 text-sm text-foreground/90">
                 <span
