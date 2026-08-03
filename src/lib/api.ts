@@ -1,24 +1,41 @@
+const API_URL = "http://127.0.0.1:8000";
+
 import { queryOptions } from "@tanstack/react-query";
 import type { Announcement, ProblemStatement, Theme } from "@/lib/sih-data";
 
+
+
 async function getJson<T>(url: string): Promise<T> {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Request failed: ${url} (${res.status})`);
+  console.log("➡️ Fetching:", `${API_URL}${url}`);
+
+  const res = await fetch(`${API_URL}${url}`);
+
+  console.log("⬅️ Status:", res.status);
+
+  if (!res.ok) {
+    throw new Error(`Request failed: ${url} (${res.status})`);
+  }
+
   return (await res.json()) as T;
 }
 
 export const themesQuery = queryOptions({
   queryKey: ["themes"],
-  queryFn: () => getJson<{ themes: Theme[] }>("/api/themes").then((d) => d.themes),
+  queryFn: () =>
+  getJson<{
+    success: boolean;
+    data: Theme[];
+  }>("/themes/").then((d) => d.data),
   staleTime: 5 * 60 * 1000,
 });
 
 export const problemStatementsQuery = queryOptions({
   queryKey: ["problem-statements"],
   queryFn: () =>
-    getJson<{ problemStatements: ProblemStatement[] }>("/api/problem-statements").then(
-      (d) => d.problemStatements,
-    ),
+    getJson<{
+      success: boolean;
+      data: ProblemStatement[];
+    }>("/problems/").then((d) => d.data),
   staleTime: 5 * 60 * 1000,
 });
 
@@ -29,14 +46,23 @@ export const announcementsQuery = queryOptions({
   staleTime: 5 * 60 * 1000,
 });
 
+
 export type RegistrationPayload = Record<string, unknown>;
 
 export async function submitRegistration(payload: RegistrationPayload) {
-  const res = await fetch("/api/register", {
+  const res = await fetch(`${API_URL}/registrations/`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify(payload),
   });
-  if (!res.ok) throw new Error("Registration request failed");
-  return (await res.json()) as { ok: boolean; reference: string };
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(JSON.stringify(data));
+  }
+
+  return data;
 }

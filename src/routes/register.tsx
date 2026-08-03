@@ -79,8 +79,7 @@ const personSchema = z.object({
   roll: z.string().trim().min(1, "Enter the roll number").max(20),
 });
 
-const schema = z
-  .object({
+const schema = z.object({
     team: z.object({
       teamName: z.string().trim().min(3, "Team name must be at least 3 characters").max(60),
       psTitle: z.string().trim().min(6, "Enter the problem statement title").max(200),
@@ -146,6 +145,7 @@ function RegisterPage() {
   const [draftLoaded, setDraftLoaded] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { data: themes } = useQuery(themesQuery);
+  console.log("Themes:", themes);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -239,7 +239,10 @@ function RegisterPage() {
     setConfirmOpen(false);
     const res = await submitRegistration(data);
     localStorage.removeItem(DRAFT_KEY);
-    setSubmitted({ reference: res.reference, values: data });
+    setSubmitted({
+          reference: res.data.registration_id,
+          values: data,
+        });
     toast.success("Internal registration recorded");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -433,7 +436,8 @@ function RegisterPage() {
               </MagneticButton>
             ) : (
               <MagneticButton
-                type="submit"
+                type="button"
+                onClick={requestSubmit}
                 disabled={isSubmitting}
                 className="bg-primary text-primary-foreground shadow-glow hover:brightness-105 disabled:opacity-70"
               >

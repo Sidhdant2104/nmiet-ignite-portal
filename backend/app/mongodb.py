@@ -1,0 +1,16 @@
+from motor.motor_asyncio import AsyncIOMotorClient
+from app.config import MONGODB_URI, DATABASE_NAME
+
+client = AsyncIOMotorClient(
+    MONGODB_URI,
+    maxPoolSize=20,
+    minPoolSize=5
+)
+
+db = client[DATABASE_NAME]
+
+registration_collection = db["registrations"]
+problem_collection = db["problem_statements"]
+theme_collection = db["themes"]
+guideline_collection = db["guidelines"]
+settings_collection = db["settings"]
