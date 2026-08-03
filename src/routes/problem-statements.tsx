@@ -6,7 +6,7 @@ import { ProblemStatementExplorer } from "@/components/problem-statement-explore
 
 const title = "Problem Statements — NMIET SIH Portal";
 const description =
-  "Search, filter and sort every Smart India Hackathon problem statement by theme, category, organisation and difficulty.";
+  "Search, filter and sort every Smart India Hackathon problem statement by theme, category and organisation.";
 
 export const Route = createFileRoute("/problem-statements")({
   head: () => ({

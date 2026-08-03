@@ -1,7 +1,28 @@
 const API_URL = "http://127.0.0.1:8000";
 
 import { queryOptions } from "@tanstack/react-query";
-import type { Announcement, ProblemStatement, Theme } from "@/lib/sih-data";
+import type { Announcement, Theme } from "@/lib/sih-data";
+
+/** Backend problem statement shape from GET /problems/ */
+export type ProblemStatement = {
+  ps_number: string;
+  title: string;
+  organization: string;
+  department: string | null;
+  category: string;
+  theme: string;
+  description: string | null;
+  submitted_ideas: number;
+  deadline: string | null;
+  source_url: string | null;
+  is_active: boolean;
+};
+
+type ProblemStatementsResponse = {
+  success: boolean;
+  count: number;
+  data: ProblemStatement[];
+};
 
 
 
@@ -31,11 +52,7 @@ export const themesQuery = queryOptions({
 
 export const problemStatementsQuery = queryOptions({
   queryKey: ["problem-statements"],
-  queryFn: () =>
-    getJson<{
-      success: boolean;
-      data: ProblemStatement[];
-    }>("/problems/").then((d) => d.data),
+  queryFn: () => getJson<ProblemStatementsResponse>("/problems/").then((d) => d.data),
   staleTime: 5 * 60 * 1000,
 });
 
