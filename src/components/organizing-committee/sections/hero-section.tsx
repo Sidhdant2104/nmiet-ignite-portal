@@ -16,10 +16,10 @@ const particles = Array.from({ length: 18 }, (_, i) => ({
   duration: 4 + (i % 5),
 }));
 
-function AnimatedPeopleWord() {
+function AnimatedPeopleWord({ className }: { className?: string }) {
   return (
     <motion.span
-      className="inline-block bg-[length:200%_auto] bg-clip-text text-transparent"
+      className={`inline-block bg-[length:200%_auto] bg-clip-text text-transparent ${className ?? ""}`}
       style={{
         backgroundImage:
           "linear-gradient(90deg, oklch(0.7 0.19 45), oklch(0.56 0.2 264), oklch(0.62 0.19 30), oklch(0.7 0.19 45))",
@@ -41,7 +41,7 @@ export function HeroSection() {
   return (
     <section
       ref={ref}
-      className="relative flex min-h-[100svh] flex-col justify-center overflow-hidden pt-28 pb-24 sm:pt-36"
+      className="relative flex min-h-[100svh] flex-col justify-center overflow-hidden pt-28 pb-24 sm:pt-36 max-md:min-h-0 max-md:pt-24 max-md:pb-14"
     >
       {/* Living background */}
       <motion.div style={{ y: yBg }} className="pointer-events-none absolute inset-0 -z-10">
@@ -78,7 +78,7 @@ export function HeroSection() {
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, ease }}
-          className="mb-10 inline-flex items-center gap-2 rounded-full border border-border/70 bg-card/50 px-4 py-1.5 text-xs font-medium text-muted-foreground backdrop-blur"
+          className="mb-10 inline-flex items-center gap-2 rounded-full border border-border/70 bg-card/50 px-4 py-1.5 text-xs font-medium text-muted-foreground backdrop-blur max-md:mb-7"
         >
           <Sparkles className="h-3.5 w-3.5 text-primary" />
           NMIET SIH 2026
@@ -88,9 +88,9 @@ export function HeroSection() {
           initial={{ opacity: 0, y: 40 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.9, delay: 0.1, ease }}
-          className="max-w-5xl font-display text-[clamp(2.75rem,8vw,5.5rem)] font-semibold leading-[1.02] tracking-tight"
+          className="max-w-5xl font-display text-[clamp(2.75rem,8vw,5.5rem)] font-semibold leading-[1.02] tracking-tight max-md:text-[clamp(2.45rem,12vw,3.4rem)] max-md:leading-[1.05]"
         >
-          Meet the <AnimatedPeopleWord />
+          Meet the <AnimatedPeopleWord className="max-md:whitespace-nowrap" />
           <br />
           Behind SIH 2026
         </motion.h1>
@@ -99,7 +99,7 @@ export function HeroSection() {
           initial={{ opacity: 0, y: 28 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.22, ease }}
-          className="mt-10 max-w-xl text-lg leading-relaxed text-muted-foreground sm:text-xl"
+          className="mt-10 max-w-xl text-lg leading-relaxed text-muted-foreground sm:text-xl max-md:mt-6 max-md:text-base max-md:leading-7"
         >
           Behind every great hackathon is a team of passionate people — faculty mentors, student
           leaders and volunteers — building the experience from the ground up.
@@ -109,14 +109,20 @@ export function HeroSection() {
           initial={{ opacity: 0, y: 32 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.34, ease }}
-          className="mt-20 flex flex-wrap gap-12 sm:gap-20"
+          className="mt-20 flex flex-wrap gap-12 sm:gap-20 max-md:mt-10 max-md:grid max-md:grid-cols-3 max-md:gap-2.5"
         >
           {heroStats.map((stat) => (
-            <div key={stat.label}>
-              <p className="font-display text-5xl font-semibold tracking-tight sm:text-6xl">
-                <CountUp value={stat.value} suffix={stat.suffix} />
+            <div key={stat.label} className="max-md:min-w-0 max-md:rounded-2xl max-md:border max-md:border-border/60 max-md:bg-card/55 max-md:px-2 max-md:py-4 max-md:text-center max-md:shadow-[0_12px_28px_oklch(0.2_0.02_260_/_8%)] max-md:backdrop-blur-md">
+              <p className="font-display text-5xl font-semibold tracking-tight sm:text-6xl max-md:text-3xl">
+                <span className="md:hidden">
+                  {stat.value}
+                  {stat.suffix}
+                </span>
+                <span className="max-md:hidden">
+                  <CountUp value={stat.value} suffix={stat.suffix} />
+                </span>
               </p>
-              <p className="mt-2 text-sm font-medium uppercase tracking-[0.16em] text-muted-foreground">
+              <p className="mt-2 text-sm font-medium uppercase tracking-[0.16em] text-muted-foreground max-md:mt-1 max-md:text-[0.58rem] max-md:leading-tight max-md:tracking-[0.1em]">
                 {stat.label}
               </p>
             </div>

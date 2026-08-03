@@ -6,10 +6,10 @@ import { cn } from "@/lib/utils";
 const ease = [0.22, 1, 0.36, 1] as const;
 
 const sizes = {
-  hero: "h-56 w-56 sm:h-72 sm:w-72 lg:h-80 lg:w-80 text-5xl sm:text-6xl",
-  xl: "h-44 w-44 sm:h-52 sm:w-52 lg:h-60 lg:w-60 text-4xl sm:text-5xl",
-  lg: "h-28 w-28 sm:h-32 sm:w-32 text-2xl sm:text-3xl",
-  md: "h-20 w-20 sm:h-24 sm:w-24 text-xl sm:text-2xl",
+  hero: "h-56 w-56 sm:h-72 sm:w-72 lg:h-80 lg:w-80 text-5xl sm:text-6xl max-md:h-48 max-md:w-48",
+  xl: "h-44 w-44 sm:h-52 sm:w-52 lg:h-60 lg:w-60 text-4xl sm:text-5xl max-md:h-36 max-md:w-36",
+  lg: "h-28 w-28 sm:h-32 sm:w-32 text-2xl sm:text-3xl max-md:h-24 max-md:w-24",
+  md: "h-20 w-20 sm:h-24 sm:w-24 text-xl sm:text-2xl max-md:h-[4.5rem] max-md:w-[4.5rem]",
 } as const;
 
 export function Portrait({

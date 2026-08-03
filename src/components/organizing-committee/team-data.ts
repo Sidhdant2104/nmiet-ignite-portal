@@ -59,12 +59,6 @@ export type OperationalTeam = {
   coLead?: TeamPerson;
 };
 
-export const heroStats = [
-  { value: 25, suffix: "+", label: "Organizers" },
-  { value: 3, suffix: "", label: "Faculty Leaders" },
-  { value: 9, suffix: "", label: "Operational Teams" },
-] as const;
-
 export const facultyLeadership: FacultyMember[] = [
   {
     role: "Principal",
@@ -281,6 +275,12 @@ export const operationalTeams: OperationalTeam[] = [
     },
   },
 ];
+
+export const heroStats = [
+  { value: 25, suffix: "+", label: "Organizers" },
+  { value: facultyLeadership.length, suffix: "", label: "Faculty Leaders" },
+  { value: operationalTeams.length, suffix: "", label: "Operational Teams" },
+] as const;
 
 export const coreTeamPlaceholder =
   "Volunteer recruitment in progress. The complete team will be announced after onboarding.";

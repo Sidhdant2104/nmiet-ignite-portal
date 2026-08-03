@@ -16,7 +16,7 @@ function StudentHero({ member, reversed }: { member: StudentLeader; reversed: bo
   return (
     <section
       ref={ref}
-      className="relative flex min-h-[100svh] items-center overflow-hidden py-24 sm:py-32"
+      className="relative flex min-h-[100svh] items-center overflow-hidden py-24 sm:py-32 max-md:min-h-0 max-md:py-14"
     >
       {/* Section glow */}
       <div
@@ -29,7 +29,7 @@ function StudentHero({ member, reversed }: { member: StudentLeader; reversed: bo
 
       <div
         className={cn(
-          "shell grid w-full items-center gap-16 lg:grid-cols-2 lg:gap-24",
+          "shell grid w-full items-center gap-16 lg:grid-cols-2 lg:gap-24 max-md:gap-8",
           reversed && "lg:[direction:rtl] lg:*:[direction:ltr]",
         )}
       >
@@ -55,14 +55,14 @@ function StudentHero({ member, reversed }: { member: StudentLeader; reversed: bo
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-80px" }}
           transition={{ duration: 0.9, delay: 0.12, ease }}
-          className="max-w-lg"
+          className="max-w-lg max-md:text-center"
         >
-          <blockquote className="font-display text-2xl font-medium leading-snug tracking-tight sm:text-3xl lg:text-[2rem] lg:leading-snug">
+          <blockquote className="font-display text-2xl font-medium leading-snug tracking-tight sm:text-3xl lg:text-[2rem] lg:leading-snug max-md:text-xl">
             &ldquo;{member.quote}&rdquo;
           </blockquote>
 
-          <div className="mt-12 border-t border-border/60 pt-8">
-            <p className="font-display text-2xl font-semibold sm:text-3xl">{member.name}</p>
+          <div className="mt-12 border-t border-border/60 pt-8 max-md:mt-7 max-md:pt-6">
+            <p className="font-display text-2xl font-semibold sm:text-3xl max-md:text-xl">{member.name}</p>
             <p className="mt-2 text-sm font-semibold uppercase tracking-[0.18em] text-primary">
               {member.role}
             </p>
@@ -82,7 +82,7 @@ function StudentHero({ member, reversed }: { member: StudentLeader; reversed: bo
 export function StudentSection() {
   return (
     <div className="relative border-t border-border/40">
-      <div className="shell py-20 sm:py-28">
+      <div className="shell py-20 sm:py-28 max-md:py-14">
         <motion.div
           initial={{ opacity: 0, y: 32 }}
           whileInView={{ opacity: 1, y: 0 }}

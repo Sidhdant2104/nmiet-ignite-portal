@@ -15,11 +15,11 @@ function FacultyStory({ member, imageRight }: { member: FacultyMember; imageRigh
   return (
     <section
       ref={ref}
-      className="relative flex min-h-[85svh] items-center py-24 sm:py-32"
+      className="relative flex min-h-[85svh] items-center py-24 sm:py-32 max-md:min-h-0 max-md:py-14"
     >
       <div
         className={cn(
-          "shell grid w-full items-center gap-12 lg:gap-24",
+          "shell grid w-full items-center gap-12 lg:gap-24 max-md:gap-7",
           imageRight ? "lg:grid-cols-[1fr_auto]" : "lg:grid-cols-[auto_1fr]",
         )}
       >
@@ -44,7 +44,7 @@ function FacultyStory({ member, imageRight }: { member: FacultyMember; imageRigh
 
         <motion.div
           className={cn(
-            "max-w-xl",
+            "max-w-xl max-md:text-center",
             imageRight ? "lg:order-1 lg:text-right lg:justify-self-end" : "lg:order-2",
           )}
           initial={{ opacity: 0, y: 48 }}
@@ -55,14 +55,14 @@ function FacultyStory({ member, imageRight }: { member: FacultyMember; imageRigh
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-primary">
             {member.role}
           </p>
-          <h2 className="mt-4 font-display text-4xl font-semibold tracking-tight sm:text-5xl lg:text-[3.25rem]">
+          <h2 className="mt-4 font-display text-4xl font-semibold tracking-tight sm:text-5xl lg:text-[3.25rem] max-md:text-3xl">
             {member.name}
           </h2>
           {member.department ? (
             <p className="mt-4 text-base text-muted-foreground sm:text-lg">{member.department}</p>
           ) : null}
           {member.description ? (
-            <p className="mt-8 text-lg leading-relaxed text-muted-foreground sm:text-xl">
+            <p className="mt-8 text-lg leading-relaxed text-muted-foreground sm:text-xl max-md:mt-5 max-md:text-base max-md:leading-7">
               {member.description}
             </p>
           ) : null}
@@ -75,7 +75,7 @@ function FacultyStory({ member, imageRight }: { member: FacultyMember; imageRigh
 export function FacultySection() {
   return (
     <div className="relative">
-      <div className="shell py-20 sm:py-28">
+      <div className="shell py-20 sm:py-28 max-md:py-14">
         <motion.div
           initial={{ opacity: 0, y: 32 }}
           whileInView={{ opacity: 1, y: 0 }}

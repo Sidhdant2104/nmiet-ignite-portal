@@ -24,13 +24,13 @@ function TeamIcon({ team }: { team: OperationalTeam }) {
 
 function LeftLayout({ team }: { team: OperationalTeam }) {
   return (
-    <div className="grid items-center gap-12 lg:grid-cols-[1fr_1.2fr] lg:gap-20">
+    <div className="grid items-center gap-12 lg:grid-cols-[1fr_1.2fr] lg:gap-20 max-md:gap-7">
       <motion.div
         initial={{ opacity: 0, x: -40 }}
         whileInView={{ opacity: 1, x: 0 }}
         viewport={{ once: true, margin: "-80px" }}
         transition={{ duration: 0.85, ease }}
-        className="flex flex-wrap items-end gap-8 sm:gap-12"
+        className="flex flex-wrap items-end gap-8 sm:gap-12 max-md:justify-center max-md:gap-5"
       >
         <LeadPortrait name={team.lead.name} photo={team.lead.photo} label="Lead" />
         {team.coLead ? (
@@ -45,13 +45,13 @@ function LeftLayout({ team }: { team: OperationalTeam }) {
         transition={{ duration: 0.85, delay: 0.08, ease }}
       >
         <TeamIcon team={team} />
-        <h3 className="mt-8 font-display text-3xl font-semibold tracking-tight sm:text-4xl lg:text-[2.75rem]">
+        <h3 className="mt-8 font-display text-3xl font-semibold tracking-tight sm:text-4xl lg:text-[2.75rem] max-md:mt-5 max-md:text-2xl">
           {team.domain}
         </h3>
-        <p className="mt-6 font-display text-xl italic leading-relaxed text-muted-foreground sm:text-2xl">
+        <p className="mt-6 font-display text-xl italic leading-relaxed text-muted-foreground sm:text-2xl max-md:mt-3 max-md:text-lg">
           &ldquo;{team.mission}&rdquo;
         </p>
-        <p className="mt-10 text-sm leading-relaxed text-muted-foreground/80">{coreTeamPlaceholder}</p>
+        <p className="mt-10 text-sm leading-relaxed text-muted-foreground/80 max-md:mt-5">{coreTeamPlaceholder}</p>
       </motion.div>
     </div>
   );
@@ -59,24 +59,24 @@ function LeftLayout({ team }: { team: OperationalTeam }) {
 
 function RightLayout({ team }: { team: OperationalTeam }) {
   return (
-    <div className="grid items-center gap-12 lg:grid-cols-[1.2fr_1fr] lg:gap-20">
+    <div className="grid items-center gap-12 lg:grid-cols-[1.2fr_1fr] lg:gap-20 max-md:gap-7">
       <motion.div
         initial={{ opacity: 0, y: 40 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, margin: "-80px" }}
         transition={{ duration: 0.85, ease }}
-        className="lg:text-right"
+        className="lg:text-right max-md:text-center"
       >
         <div className="lg:flex lg:justify-end">
           <TeamIcon team={team} />
         </div>
-        <h3 className="mt-8 font-display text-3xl font-semibold tracking-tight sm:text-4xl lg:text-[2.75rem]">
+        <h3 className="mt-8 font-display text-3xl font-semibold tracking-tight sm:text-4xl lg:text-[2.75rem] max-md:mt-5 max-md:text-2xl">
           {team.domain}
         </h3>
-        <p className="mt-6 font-display text-xl italic leading-relaxed text-muted-foreground sm:text-2xl">
+        <p className="mt-6 font-display text-xl italic leading-relaxed text-muted-foreground sm:text-2xl max-md:mt-3 max-md:text-lg">
           &ldquo;{team.mission}&rdquo;
         </p>
-        <p className="mt-10 text-sm leading-relaxed text-muted-foreground/80">{coreTeamPlaceholder}</p>
+        <p className="mt-10 text-sm leading-relaxed text-muted-foreground/80 max-md:mt-5">{coreTeamPlaceholder}</p>
       </motion.div>
 
       <motion.div
@@ -84,7 +84,7 @@ function RightLayout({ team }: { team: OperationalTeam }) {
         whileInView={{ opacity: 1, x: 0 }}
         viewport={{ once: true, margin: "-80px" }}
         transition={{ duration: 0.85, delay: 0.08, ease }}
-        className="flex flex-wrap items-end justify-start gap-8 sm:gap-12 lg:justify-end"
+        className="flex flex-wrap items-end justify-start gap-8 sm:gap-12 lg:justify-end max-md:justify-center max-md:gap-5"
       >
         <LeadPortrait name={team.lead.name} photo={team.lead.photo} label="Lead" />
         {team.coLead ? (
@@ -107,21 +107,21 @@ function CenterLayout({ team }: { team: OperationalTeam }) {
       <div className="flex justify-center">
         <TeamIcon team={team} />
       </div>
-      <h3 className="mt-8 font-display text-3xl font-semibold tracking-tight sm:text-4xl lg:text-[2.75rem]">
+      <h3 className="mt-8 font-display text-3xl font-semibold tracking-tight sm:text-4xl lg:text-[2.75rem] max-md:mt-5 max-md:text-2xl">
         {team.domain}
       </h3>
-      <p className="mt-6 font-display text-xl italic leading-relaxed text-muted-foreground sm:text-2xl">
+      <p className="mt-6 font-display text-xl italic leading-relaxed text-muted-foreground sm:text-2xl max-md:mt-3 max-md:text-lg">
         &ldquo;{team.mission}&rdquo;
       </p>
 
-      <div className="mt-14 flex flex-wrap items-start justify-center gap-10 sm:gap-16">
+      <div className="mt-14 flex flex-wrap items-start justify-center gap-10 sm:gap-16 max-md:mt-7 max-md:gap-5">
         <LeadPortrait name={team.lead.name} photo={team.lead.photo} label="Lead" />
         {team.coLead ? (
           <LeadPortrait name={team.coLead.name} photo={team.coLead.photo} label="Co-Lead" />
         ) : null}
       </div>
 
-      <p className="mt-14 text-sm leading-relaxed text-muted-foreground/80">{coreTeamPlaceholder}</p>
+      <p className="mt-14 text-sm leading-relaxed text-muted-foreground/80 max-md:mt-6">{coreTeamPlaceholder}</p>
     </motion.div>
   );
 }
@@ -136,7 +136,7 @@ function TeamStory({ team }: { team: OperationalTeam }) {
   const Layout = layoutComponents[team.layout];
 
   return (
-    <section className="relative flex min-h-[85svh] items-center py-24 sm:py-32">
+    <section className="relative flex min-h-[85svh] items-center py-24 sm:py-32 max-md:min-h-0 max-md:py-14">
       {/* Accent glow */}
       <div
         aria-hidden
@@ -163,7 +163,7 @@ function TeamStory({ team }: { team: OperationalTeam }) {
 export function OperationalSection() {
   return (
     <div className="relative border-t border-border/40">
-      <div className="shell py-20 sm:py-28">
+      <div className="shell py-20 sm:py-28 max-md:py-14">
         <motion.div
           initial={{ opacity: 0, y: 32 }}
           whileInView={{ opacity: 1, y: 0 }}
