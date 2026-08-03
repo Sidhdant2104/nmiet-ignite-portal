@@ -1,4 +1,6 @@
-const API_URL = "http://127.0.0.1:8000";
+const API_URL =
+  import.meta.env.VITE_API_URL ||
+  "https://nmiet-sih-backend.onrender.com";
 
 import { queryOptions } from "@tanstack/react-query";
 import type { Announcement, Theme } from "@/lib/sih-data";
