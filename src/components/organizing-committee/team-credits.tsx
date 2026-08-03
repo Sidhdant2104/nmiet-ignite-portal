@@ -23,9 +23,9 @@ export function TeamCreditsBlock({
       initial={{ opacity: 0, y: 16 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-40px" }}
-      transition={{ duration: 0.65, delay: 0.12, ease }}
+      transition={{ duration: 0.7, delay: 0.12, ease }}
       className={cn(
-        "relative overflow-hidden rounded-[1.65rem] border border-border/60 bg-background/40 p-5 shadow-[0_10px_30px_oklch(0.2_0.02_260_/_5%)] backdrop-blur sm:p-7",
+        "group relative overflow-hidden rounded-[1.65rem] border border-border/60 bg-background/40 p-5 shadow-[0_10px_30px_oklch(0.2_0.02_260_/_5%)] backdrop-blur transition-[transform,box-shadow,border-color] duration-[320ms] hover:-translate-y-1.5 hover:border-border hover:shadow-lift sm:p-7",
         className,
       )}
     >

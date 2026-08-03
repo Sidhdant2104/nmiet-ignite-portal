@@ -10,18 +10,20 @@ function TeamIcon({ team }: { team: OperationalTeam }) {
   const Icon = team.icon;
 
   return (
-    <span
+    <motion.span
+      whileHover={{ rotate: 3, scale: 1.05 }}
+      transition={{ duration: 0.32, ease }}
       className="grid h-14 w-14 place-items-center rounded-2xl border border-white/20 shadow-sm backdrop-blur sm:h-16 sm:w-16"
       style={{ background: team.accent.glow, color: team.accent.accent }}
     >
       <Icon className="h-7 w-7 sm:h-8 sm:w-8" strokeWidth={1.6} />
-    </span>
+    </motion.span>
   );
 }
 
 function LeaderCard({ person, label, team }: { person: TeamPerson; label: string; team: OperationalTeam }) {
   return (
-    <article className="group relative flex min-w-0 flex-col items-center overflow-hidden rounded-[1.65rem] border border-border/60 bg-background/45 px-5 py-8 text-center shadow-[0_12px_32px_oklch(0.2_0.02_260_/_6%)] transition-[transform,box-shadow,border-color] duration-300 hover:-translate-y-1 hover:border-border hover:shadow-lift sm:px-8 sm:py-9">
+    <article className="group relative flex min-w-0 flex-col items-center overflow-hidden rounded-[1.65rem] border border-border/60 bg-background/45 px-5 py-8 text-center shadow-[0_12px_32px_oklch(0.2_0.02_260_/_6%)] transition-[transform,box-shadow,border-color] duration-[320ms] hover:-translate-y-2 hover:scale-[1.015] hover:border-border hover:shadow-lift sm:px-8 sm:py-9">
       <div
         aria-hidden
         className="pointer-events-none absolute inset-x-10 top-0 h-px opacity-80"
@@ -29,8 +31,8 @@ function LeaderCard({ person, label, team }: { person: TeamPerson; label: string
       />
       <motion.div
         className="mx-auto w-fit"
-        animate={{ y: [0, -3, 0] }}
-        transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+        animate={{ y: [0, -4, 0] }}
+        transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
       >
         <Portrait name={person.name} photo={person.photo} size="xl" glowColor={team.accent.glow} />
       </motion.div>
@@ -44,20 +46,23 @@ function LeaderCard({ person, label, team }: { person: TeamPerson; label: string
   );
 }
 
-function OperationalDomainCard({ team }: { team: OperationalTeam }) {
+function OperationalDomainCard({ team, index }: { team: OperationalTeam; index: number }) {
+  const creditsFirst = index % 3 === 2;
+
   return (
     <motion.article
-      initial={{ opacity: 0, y: 24 }}
+      initial={{ opacity: 0, y: 40 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-60px" }}
-      transition={{ duration: 0.42, ease }}
-      whileHover={{ y: -4 }}
+      transition={{ duration: 0.8, delay: (index % 3) * 0.08, ease }}
       className="group relative mx-auto w-full max-w-4xl overflow-hidden rounded-[2rem] border border-border/70 bg-card/65 p-1 shadow-soft backdrop-blur-xl transition-[transform,box-shadow] duration-300 hover:shadow-lift sm:rounded-[2.5rem]"
     >
-      <div
+      <motion.div
         aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-70"
+        className="pointer-events-none absolute inset-0"
         style={{ background: `linear-gradient(135deg, ${team.accent.glow}, transparent 42%, ${team.accent.glow})` }}
+        animate={{ opacity: [0.32, 0.52, 0.32], scale: [1, 1.04, 1] }}
+        transition={{ duration: 9, repeat: Infinity, ease: "easeInOut" }}
       />
       <div className="relative rounded-[1.8rem] border border-white/25 bg-background/35 px-5 py-8 sm:rounded-[2.3rem] sm:px-10 sm:py-11">
         <header className="mx-auto flex max-w-xl flex-col items-center text-center">
@@ -69,12 +74,17 @@ function OperationalDomainCard({ team }: { team: OperationalTeam }) {
           <p className="mt-3 max-w-md text-sm leading-relaxed text-muted-foreground/85">{team.description}</p>
         </header>
 
-        <div className={`mx-auto mt-8 grid w-full gap-4 ${team.coLead ? "max-w-3xl sm:grid-cols-2" : "max-w-md"}`}>
-          <LeaderCard person={team.lead} label="Lead" team={team} />
-          {team.coLead ? <LeaderCard person={team.coLead} label="Co-Lead" team={team} /> : null}
-        </div>
+        <div className="mt-8 grid items-stretch gap-4 lg:mt-10 lg:grid-cols-2 lg:gap-6">
+          <div className={`grid content-start gap-4 ${creditsFirst ? "lg:order-2" : "lg:order-1"}`}>
+            <LeaderCard person={team.lead} label="Lead" team={team} />
+            {team.coLead ? <LeaderCard person={team.coLead} label="Co-Lead" team={team} /> : null}
+          </div>
 
-        <TeamCreditsBlock accentColor={team.accent.accent} className="mx-auto mt-4 max-w-3xl sm:mt-5" />
+          <TeamCreditsBlock
+            accentColor={team.accent.accent}
+            className={`h-full ${creditsFirst ? "lg:order-1" : "lg:order-2"}`}
+          />
+        </div>
       </div>
     </motion.article>
   );
@@ -99,8 +109,8 @@ export function OperationalSection() {
         </motion.div>
 
         <div className="mt-10 space-y-8 sm:mt-14 sm:space-y-10">
-          {operationalTeams.map((team) => (
-            <OperationalDomainCard key={team.id} team={team} />
+          {operationalTeams.map((team, index) => (
+            <OperationalDomainCard key={team.id} team={team} index={index} />
           ))}
         </div>
       </div>
