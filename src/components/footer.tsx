@@ -12,6 +12,11 @@ export function Footer() {
                 alt="NMIET"
                 className="h-8 w-auto object-contain sm:h-10 md:h-12"
               />
+               <img
+                src="/logos/IIC.png"
+                alt="Innovation & Incubation Council"
+                className="h-7 w-auto object-contain sm:h-8 md:h-10"
+              />
             <span className="font-display text-sm font-semibold">NMIET SIH Portal</span>
           </div>
           <p className="mt-4 max-w-sm text-sm leading-relaxed text-muted-foreground">
