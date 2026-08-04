@@ -1,5 +1,6 @@
 from app.scrapers.base_scraper import BaseScraper
 from app.scrapers.theme_parser import ThemeParser
+from app.mongodb import theme_collection
 
 
 class ThemeScraper(BaseScraper):
@@ -17,6 +18,13 @@ class ThemeScraper(BaseScraper):
         parser = ThemeParser()
 
         themes = await parser.parse(self.page)
+
+        # Refresh themes collection
+        await theme_collection.delete_many({})
+
+        if themes:
+            await theme_collection.insert_many(themes)
+            print(f"✅ Saved {len(themes)} themes to MongoDB")
 
         await self.close()
 
