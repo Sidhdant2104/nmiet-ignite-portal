@@ -35,7 +35,10 @@ function StudentHero({ member, reversed }: { member: StudentLeader; reversed: bo
       >
         <motion.div
           style={{ y: yPortrait }}
-          className="flex justify-center lg:justify-start"
+          className={cn(
+          "flex justify-center",
+          reversed ? "lg:justify-start" : "lg:justify-end"
+          )}
           initial={{ opacity: 0, scale: 0.92 }}
           whileInView={{ opacity: 1, scale: 1 }}
           viewport={{ once: true, margin: "-100px" }}
