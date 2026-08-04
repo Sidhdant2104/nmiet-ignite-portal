@@ -197,6 +197,12 @@ export const operationalTeams: OperationalTeam[] = [
       year: "Second Year",
       department: "ENTC Engineering",
     },
+    coLead: {
+      name: "Sayali Nemade",
+      photo: photo("sayali-nemade"),
+      year: "Third Year",
+      department: "Computer Science Engineering",
+    },
   },
   {
     id: "food",

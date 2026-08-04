@@ -70,7 +70,7 @@ export function ContactSection() {
                 <div className="min-w-0">
                   <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Email</p>
                   <a href="mailto:sih@nmiet.edu.in" className="mt-1 block break-words font-medium transition-colors hover:text-primary">
-                    sih@nmiet.edu.in
+                    aishwini.shinde@nmiet.edu.in
                   </a>
                 </div>
               </li>
@@ -80,7 +80,7 @@ export function ContactSection() {
                 </span>
                 <div className="min-w-0">
                   <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Phone</p>
-                  <p className="mt-1 font-medium">+91 XXXXX XXXXX</p>
+                  <p className="mt-1 font-medium">+91 80559 35256</p>
                 </div>
               </li>
             </ul>
@@ -152,7 +152,7 @@ export function ContactSection() {
                 <div className="min-w-0">
                   <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Email</p>
                   <a href="mailto:student@sih.nmiet.edu.in" className="mt-1 block break-words font-medium transition-colors hover:text-primary">
-                    student@sih.nmiet.edu.in
+                    vivek.tapkire@nmiet.edu.in
                   </a>
                 </div>
               </li>
@@ -162,7 +162,7 @@ export function ContactSection() {
                 </span>
                 <div className="min-w-0">
                   <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Phone</p>
-                  <p className="mt-1 font-medium">+91 XXXXX XXXXX</p>
+                  <p className="mt-1 font-medium">+91 93220 53251</p>
                 </div>
               </li>
             </ul>
