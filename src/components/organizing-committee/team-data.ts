@@ -230,8 +230,8 @@ export const operationalTeams: OperationalTeam[] = [
       department: "Computer Engineering",
     },
     coLead: {
-      name: "Ayush Khadake",
-      photo: photo("ayush-khadake"),
+      name: "Aayush Khadake",
+      photo: photo("aayush-khadake"),
       year: "Second Year",
       department: "Mechanical Engineering",
     },
