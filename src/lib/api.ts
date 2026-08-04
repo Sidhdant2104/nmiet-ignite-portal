@@ -3,7 +3,20 @@ const API_URL =
   "https://nmiet-sih-backend.onrender.com";
 
 import { queryOptions } from "@tanstack/react-query";
-import type { Announcement, Theme } from "@/lib/sih-data";
+import type { Announcement } from "@/lib/sih-data";
+
+/** Theme shape returned by the SIH backend's GET /themes/ endpoint. */
+export type Theme = {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+};
+
+type ThemesResponse = {
+  success: boolean;
+  data: Array<Omit<Theme, "id" | "icon"> & { id?: string; _id?: string; icon?: string | null }>;
+};
 
 /** Backend problem statement shape from GET /problems/ */
 export type ProblemStatement = {
@@ -45,10 +58,13 @@ async function getJson<T>(url: string): Promise<T> {
 export const themesQuery = queryOptions({
   queryKey: ["themes"],
   queryFn: () =>
-  getJson<{
-    success: boolean;
-    data: Theme[];
-  }>("/themes/").then((d) => d.data),
+    getJson<ThemesResponse>("/themes/").then((response) =>
+      response.data.map(({ _id, id, icon, ...theme }) => ({
+        ...theme,
+        id: id ?? _id ?? theme.name,
+        icon: icon ?? "",
+      })),
+    ),
   staleTime: 5 * 60 * 1000,
 });
 

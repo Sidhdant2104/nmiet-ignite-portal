@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { ArrowRight, Compass, MapPin, Sparkles } from "lucide-react";
 import { useRef } from "react";
@@ -8,6 +9,7 @@ import { MagneticButton } from "@/components/motion/magnetic-button";
 import { AnnouncementTicker } from "@/components/sections/announcement-ticker";
 import { SupportedBySection } from "@/components/sections/supported-by";
 import InnovationMap from "@/components/InnovationMap";
+import { themesQuery } from "@/lib/api";
 
 const ease = [0.22, 1, 0.36, 1] as const;
 
@@ -26,6 +28,7 @@ const innovationHubs = [
 
 export function Hero() {
   const ref = useRef<HTMLDivElement>(null);
+  const { data: themes } = useQuery(themesQuery);
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end start"] });
   const yFar = useTransform(scrollYProgress, [0, 1], [0, 140]);
   const yNear = useTransform(scrollYProgress, [0, 1], [0, -80]);
@@ -104,7 +107,7 @@ export function Hero() {
             <div className="hover-lift rounded-3xl border border-border bg-card/70 p-5 backdrop-blur">
               <dt className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Themes</dt>
               <dd className="mt-1.5 font-display text-3xl font-semibold">
-                <Counter to={18} />
+                <Counter to={themes?.length ?? 0} />
               </dd>
             </div>
 

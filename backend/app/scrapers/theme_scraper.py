@@ -5,7 +5,7 @@ from app.mongodb import theme_collection
 
 class ThemeScraper(BaseScraper):
 
-    URL = "https://sih.gov.in"
+    URL = "https://sih.gov.in/SIH_Themes"
 
     async def run(self):
 
@@ -14,7 +14,9 @@ class ThemeScraper(BaseScraper):
         print("🌐 Opening SIH Website...")
 
         await self.goto(self.URL)
+        await self.page.wait_for_timeout(5000)
 
+       
         parser = ThemeParser()
 
         themes = await parser.parse(self.page)

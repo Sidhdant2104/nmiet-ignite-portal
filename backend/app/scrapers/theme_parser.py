@@ -5,38 +5,32 @@ class ThemeParser:
 
     async def parse(self, page):
 
-        headings = page.locator("h1, h2, h3, h4, h5")
-
-        count = await headings.count()
-
-        collecting = False
+        rows = page.locator("table.partnerTable tbody tr")
 
         themes = []
 
-        seen = set()
+        for i in range(await rows.count()):
 
-        for i in range(count):
+            row = rows.nth(i)
 
-            text = (await headings.nth(i).inner_text()).strip()
+            name = (
+                await row.locator(".themesTitle h3").inner_text()
+            ).strip()
 
-            if text == "THEMES":
-                collecting = True
-                continue
+            description = (
+                await row.locator(".themesDetails p").inner_text()
+            ).strip()
 
-            if text == "SIH PROCESS FLOW AND TIMELINE":
-                break
+            icon = await row.locator(".themeImg2022 img").get_attribute("src")
 
-            if not collecting:
-                continue
-
-            if text in seen:
-                continue
-
-            seen.add(text)
+            if icon:
+                icon = f"https://sih.gov.in{icon}"
 
             themes.append(
                 Theme(
-                    name=text
+                    name=name,
+                    description=description,
+                    icon=icon,
                 ).model_dump()
             )
 

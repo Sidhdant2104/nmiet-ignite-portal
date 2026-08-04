@@ -15,6 +15,7 @@ import { Route as OrganizingCommitteeRouteImport } from './routes/organizing-com
 import { Route as PreviousYearsRouteImport } from './routes/previous-years'
 import { Route as ProblemStatementsRouteImport } from './routes/problem-statements'
 import { Route as RegisterRouteImport } from './routes/register'
+import { Route as ThemesRouteImport } from './routes/themes'
 import { Route as ApiAnnouncementsRouteImport } from './routes/api/announcements'
 import { Route as ApiProblemStatementsRouteImport } from './routes/api/problem-statements'
 import { Route as ApiRegisterRouteImport } from './routes/api/register'
@@ -50,6 +51,11 @@ const RegisterRoute = RegisterRouteImport.update({
   path: '/register',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ThemesRoute = ThemesRouteImport.update({
+  id: '/themes',
+  path: '/themes',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAnnouncementsRoute = ApiAnnouncementsRouteImport.update({
   id: '/api/announcements',
   path: '/api/announcements',
@@ -78,6 +84,7 @@ export interface FileRoutesByFullPath {
   '/previous-years': typeof PreviousYearsRoute
   '/problem-statements': typeof ProblemStatementsRoute
   '/register': typeof RegisterRoute
+  '/themes': typeof ThemesRoute
   '/api/announcements': typeof ApiAnnouncementsRoute
   '/api/problem-statements': typeof ApiProblemStatementsRoute
   '/api/register': typeof ApiRegisterRoute
@@ -90,6 +97,7 @@ export interface FileRoutesByTo {
   '/previous-years': typeof PreviousYearsRoute
   '/problem-statements': typeof ProblemStatementsRoute
   '/register': typeof RegisterRoute
+  '/themes': typeof ThemesRoute
   '/api/announcements': typeof ApiAnnouncementsRoute
   '/api/problem-statements': typeof ApiProblemStatementsRoute
   '/api/register': typeof ApiRegisterRoute
@@ -103,6 +111,7 @@ export interface FileRoutesById {
   '/previous-years': typeof PreviousYearsRoute
   '/problem-statements': typeof ProblemStatementsRoute
   '/register': typeof RegisterRoute
+  '/themes': typeof ThemesRoute
   '/api/announcements': typeof ApiAnnouncementsRoute
   '/api/problem-statements': typeof ApiProblemStatementsRoute
   '/api/register': typeof ApiRegisterRoute
@@ -117,6 +126,7 @@ export interface FileRouteTypes {
     | '/previous-years'
     | '/problem-statements'
     | '/register'
+    | '/themes'
     | '/api/announcements'
     | '/api/problem-statements'
     | '/api/register'
@@ -129,6 +139,7 @@ export interface FileRouteTypes {
     | '/previous-years'
     | '/problem-statements'
     | '/register'
+    | '/themes'
     | '/api/announcements'
     | '/api/problem-statements'
     | '/api/register'
@@ -141,6 +152,7 @@ export interface FileRouteTypes {
     | '/previous-years'
     | '/problem-statements'
     | '/register'
+    | '/themes'
     | '/api/announcements'
     | '/api/problem-statements'
     | '/api/register'
@@ -154,6 +166,7 @@ export interface RootRouteChildren {
   PreviousYearsRoute: typeof PreviousYearsRoute
   ProblemStatementsRoute: typeof ProblemStatementsRoute
   RegisterRoute: typeof RegisterRoute
+  ThemesRoute: typeof ThemesRoute
   ApiAnnouncementsRoute: typeof ApiAnnouncementsRoute
   ApiProblemStatementsRoute: typeof ApiProblemStatementsRoute
   ApiRegisterRoute: typeof ApiRegisterRoute
@@ -204,6 +217,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RegisterRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/themes': {
+      id: '/themes'
+      path: '/themes'
+      fullPath: '/themes'
+      preLoaderRoute: typeof ThemesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/announcements': {
       id: '/api/announcements'
       path: '/api/announcements'
@@ -242,6 +262,7 @@ const rootRouteChildren: RootRouteChildren = {
   PreviousYearsRoute: PreviousYearsRoute,
   ProblemStatementsRoute: ProblemStatementsRoute,
   RegisterRoute: RegisterRoute,
+  ThemesRoute: ThemesRoute,
   ApiAnnouncementsRoute: ApiAnnouncementsRoute,
   ApiProblemStatementsRoute: ApiProblemStatementsRoute,
   ApiRegisterRoute: ApiRegisterRoute,
