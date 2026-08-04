@@ -167,10 +167,10 @@ export const announcements: Announcement[] = [
     body: "The internal jury shortlists 45 teams for official SIH nomination with 5 teams on standby.",
   },
   {
-    id: "a4",
-    date: "2026-08-05",
-    tag: "Mentors",
-    title: "Faculty mentor mapping support",
-    body: "Teams without a mentor can request one through the NMIET innovation cell.",
-  },
+  id: "a4",
+  date: "2026-08-05",
+  tag: "Mentors",
+  title: "Faculty mentor support available",
+  body: "Faculty mentors are optional during internal registration. Teams that wish to have a mentor but haven't found one yet can request assistance from the NMIET Innovation Cell.",
+},
 ];

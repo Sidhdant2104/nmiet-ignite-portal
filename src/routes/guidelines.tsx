@@ -86,21 +86,25 @@ const eligibility = [
 
 const teamFormation = [
   {
-    step: "01",
-    title: "Find your six",
-    body: "Mix departments and years — hardware, software and design skills in one room win rounds.",
-  },
-  {
-    step: "02",
-    title: "Include a female member",
-    body: "Mandatory for every team. Verify before you register.",
-  },
-  { step: "03", title: "Pick a leader", body: "One leader is the single point of contact." },
-  {
-    step: "04",
-    title: "Lock a faculty mentor",
-    body: "One mentor per team, who guides and verifies the submission.",
-  },
+  step: "01",
+  title: "Find your six",
+  body: "Form a team of exactly six student members with a balanced mix of skills and expertise.",
+},
+{
+  step: "02",
+  title: "Include a female member",
+  body: "Every team must include at least one female member as per SIH guidelines.",
+},
+{
+  step: "03",
+  title: "Pick a leader",
+  body: "Choose one team leader who will act as the primary point of contact throughout the competition.",
+},
+{
+  step: "04",
+  title: "Add a faculty mentor (Optional)",
+  body: "You may register without a faculty mentor initially. A mentor can be assigned or updated later if required.",
+},
 ];
 
 const internalProcess = [
@@ -113,18 +117,30 @@ const internalProcess = [
 ];
 
 const psSelection = [
-  "Shortlist 3 statements your team can genuinely prototype.",
-  "Match the statement's category (Software or Hardware) to your team's strength.",
-  "Confirm the theme aligns with your mentor's expertise.",
-  "Note the exact PS ID and title — you will need both while registering.",
-  "Avoid statements that need proprietary data your team cannot access.",
+  "Shortlist 3–5 problem statements your team can confidently solve.",
+  "Choose a statement that matches your team's technical strengths (Software or Hardware).",
+  "Evaluate the problem's feasibility, innovation potential, and expected impact.",
+  "Note the exact Problem Statement (PS) ID and title—you'll need them during registration.",
+  "Avoid statements that depend on proprietary data, unavailable hardware, or unrealistic implementation timelines.",
 ];
 
 const ideaSubmission = [
-  { title: "Idea document", body: "Problem understanding, proposed solution and impact." },
-  { title: "Technical approach", body: "Architecture, stack, hardware BOM and feasibility." },
-  { title: "Prototype evidence", body: "Screenshots, demo video or working link." },
-  { title: "Mentor sign-off", body: "Faculty mentor confirms the submission before upload." },
+  {
+    title: "Idea document",
+    body: "Explain the problem, your proposed solution, innovation, and expected impact.",
+  },
+  {
+    title: "Technical approach",
+    body: "Describe your architecture, technology stack, hardware requirements, and feasibility.",
+  },
+  {
+    title: "Prototype evidence",
+    body: "Include screenshots, a demo video, Figma design, GitHub repository, or a working prototype link.",
+  },
+  {
+    title: "Faculty mentor (Optional)",
+    body: "A faculty mentor is recommended but not mandatory during registration. Mentor details can be added later if required.",
+  },
 ];
 
 const criteria = [
@@ -136,13 +152,13 @@ const criteria = [
 ];
 
 const rules = [
-  "A student may appear in only one internal entry — duplicate names invalidate both teams.",
-  "All 6 members must belong to the same college.",
-  "At least one female member is mandatory.",
-  "Every team must have one faculty mentor.",
-  "Plagiarised or previously submitted ideas are rejected.",
-  "The team leader's contact details are used for all official communication.",
-  "Details cannot be changed after nomination is filed with SIH.",
+  "A student can be part of only one team. Duplicate registrations may lead to disqualification.",
+  "All six student members must belong to the same college.",
+  "At least one female member is mandatory in every team.",
+  "A faculty mentor is optional during registration and can be added later if required.",
+  "Plagiarised, copied, or previously submitted ideas are not eligible.",
+  "The team leader's contact details will be used for all official communication.",
+  "Once the institute nominates teams to SIH, changes to team details may not be permitted.",
 ];
 
 const faqs = [
@@ -164,7 +180,7 @@ const faqs = [
   },
   {
     q: "What if we don't have a faculty mentor yet?",
-    a: "Register with your preferred mentor's details after speaking to them. The innovation cell can help map a mentor to your theme.",
+    a: "You can still complete your registration. Faculty mentor details are optional during the internal selection process and can be added later if required by the institute or SIH.",
   },
   {
     q: "Do we need a finished product to register?",
@@ -181,10 +197,22 @@ const faqs = [
 ];
 
 const downloads = [
-  { title: "Team formation checklist", meta: "PDF · placeholder" },
-  { title: "Idea submission template", meta: "PPTX · placeholder" },
-  { title: "Internal hackathon rulebook", meta: "PDF · placeholder" },
-  { title: "Mentor consent form", meta: "PDF · placeholder" },
+  {
+    title: "NMIET SIH 2026 Guidelines",
+    meta: "PDF",
+  },
+  {
+    title: "Idea Presentation Template",
+    meta: "PPTX",
+  },
+  {
+    title: "Team Formation Checklist",
+    meta: "PDF",
+  },
+  {
+    title: "Registration Guide",
+    meta: "PDF",
+  },
 ];
 
 function GuidelinesPage() {
@@ -276,37 +304,39 @@ function GuidelinesPage() {
             </ol>
           </Block>
 
-          <Block id="registration" icon={ClipboardList} title="Registration process">
-            <div className="rounded-4xl border border-border bg-card p-6 shadow-soft">
-              <ol className="grid gap-4 sm:grid-cols-2">
-                {[
-                  "Open the registration page and enter team details with the PS ID.",
-                  "Add complete details for the leader and all five members.",
-                  "Add faculty mentor details.",
-                  "Review everything on the confirmation page, then Confirm & Submit.",
-                ].map((r, i) => (
-                  <li key={r} className="flex gap-3 rounded-2xl bg-accent/50 p-4">
-                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
-                      {i + 1}
-                    </span>
-                    <span className="text-sm leading-relaxed text-muted-foreground">{r}</span>
-                  </li>
-                ))}
-              </ol>
-              <div className="mt-6 flex flex-wrap gap-3">
-                <Link to="/register">
-                  <MagneticButton className="bg-primary px-6 py-3 text-primary-foreground shadow-glow hover:brightness-105">
-                    Start registration
-                  </MagneticButton>
-                </Link>
-                <Link to="/problem-statements">
-                  <MagneticButton className="border border-border bg-card/70 px-6 py-3 text-foreground hover:bg-accent">
-                    Browse problem statements
-                  </MagneticButton>
-                </Link>
-              </div>
-            </div>
-          </Block>
+         <Block id="registration" icon={ClipboardList} title="Registration process">
+  <div className="rounded-4xl border border-border bg-card p-6 shadow-soft">
+    <ol className="grid gap-4 sm:grid-cols-2">
+      {[
+        "Open the registration page and enter your team details along with the selected Problem Statement (PS) ID.",
+        "Fill in complete details for the team leader and all five team members.",
+        "Add faculty mentor details if available (optional and can be updated later if required).",
+        "Review all the information carefully, then click Confirm & Submit to complete your registration.",
+      ].map((r, i) => (
+        <li key={r} className="flex gap-3 rounded-2xl bg-accent/50 p-4">
+          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+            {i + 1}
+          </span>
+          <span className="text-sm leading-relaxed text-muted-foreground">{r}</span>
+        </li>
+      ))}
+    </ol>
+
+    <div className="mt-6 flex flex-wrap gap-3">
+      <Link to="/register">
+        <MagneticButton className="bg-primary px-6 py-3 text-primary-foreground shadow-glow hover:brightness-105">
+          Start Registration
+        </MagneticButton>
+      </Link>
+
+      <Link to="/problem-statements">
+        <MagneticButton className="border border-border bg-card/70 px-6 py-3 text-foreground hover:bg-accent">
+          Browse Problem Statements
+        </MagneticButton>
+      </Link>
+    </div>
+  </div>
+</Block>
 
           <Block id="ps-selection" icon={ListChecks} title="Problem statement selection">
             <ul className="space-y-3">

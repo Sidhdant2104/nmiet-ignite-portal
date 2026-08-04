@@ -44,10 +44,26 @@ const benefits = [
 ];
 
 const journey = [
-  { step: "01", title: "Form your team", body: "Six students, one leader, one faculty mentor." },
-  { step: "02", title: "Pick a statement", body: "Choose from 400+ statements across 17 themes." },
-  { step: "03", title: "Clear internals", body: "Present to the NMIET evaluation panel." },
-  { step: "04", title: "Go national", body: "Represent NMIET at the SIH grand finale." },
+  {
+    step: "01",
+    title: "Form your team",
+    body: "Build a team of 6 NMIET students with one designated team leader. Faculty mentor is optional.",
+  },
+  {
+    step: "02",
+    title: "Choose a problem statement",
+    body: "Explore 400+ official SIH problem statements across 18 themes and select the one your team wants to solve.",
+  },
+  {
+    step: "03",
+    title: "Internal evaluation",
+    body: "Present your idea to the NMIET evaluation panel. Top teams will be nominated for SIH 2026.",
+  },
+  {
+    step: "04",
+    title: "Official SIH journey",
+    body: "Shortlisted teams will be registered on the official SIH Portal and continue through the national selection process.",
+  },
 ];
 
 export function AboutSection() {

@@ -13,18 +13,17 @@ export function TeamStructureSection() {
         className="pointer-events-none absolute left-1/2 top-1/2 h-[26rem] w-[26rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand-blue/10 blur-[120px]"
       />
       <div className="shell">
-        <SectionHeading
-          eyebrow="Team structure"
-          title={
-            <>
-              One leader, five members,{" "}
-              <span className="text-gradient">one faculty mentor</span>
-            </>
-          }
-          description="Every SIH team is exactly six students plus a mentor who signs off on the submission. Here's how the roles connect."
-          align="center"
-        />
-
+  <SectionHeading
+    eyebrow="Team structure"
+    title={
+      <>
+        One leader, five members,{" "}
+        <span className="text-gradient">one complete team</span>
+      </>
+    }
+    description="Every SIH team consists of exactly six NMIET student members, including one designated team leader. Faculty mentor details are optional during the internal registration process and can be added later if required."
+    align="center"
+  />
         <Reveal className="mt-16">
           <div className="glass relative mx-auto max-w-4xl rounded-4xl p-8 shadow-lift sm:p-12">
             <div className="flex flex-col items-center">

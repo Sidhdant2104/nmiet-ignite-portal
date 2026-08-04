@@ -47,8 +47,7 @@ import { departments } from "@/lib/departments";
 
 const title = "Register your team — NMIET SIH Portal";
 const description =
-  "Submit your NMIET internal Smart India Hackathon 2026 entry: team details, complete member details and faculty mentor, with a full review before submission.";
-
+  "Submit your NMIET Smart India Hackathon 2026 internal registration with complete team details, member information, an optional faculty mentor, and a final review before submission.";
 export const Route = createFileRoute("/register")({
   head: () => ({
     meta: [
@@ -89,12 +88,53 @@ const schema = z.object({
     }),
     leader: personSchema,
     members: z.array(personSchema).length(5),
-    mentor: z.object({
-      name: z.string().trim().min(3, "Enter the mentor's full name").max(80),
-      email: z.string().trim().email("Enter a valid email").max(120),
-      mobile: z.string().regex(/^[6-9]\d{9}$/, "Enter a valid 10-digit mobile number"),
-      department: z.enum(departments, { message: "Select a department" }),
-    }),
+    mentor: z
+  .object({
+    name: z.string().trim(),
+    email: z.string().trim(),
+    mobile: z.string().trim(),
+    department: z.string().trim(),
+  })
+  .superRefine((mentor, ctx) => {
+    const hasAnyField = Object.values(mentor).some(
+      (value) => value && value.trim() !== "",
+    );
+
+    // Completely empty mentor section is allowed
+    if (!hasAnyField) return;
+
+    if (mentor.name.length < 3) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["name"],
+        message: "Enter the mentor's full name",
+      });
+    }
+
+    if (!z.string().email().safeParse(mentor.email).success) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["email"],
+        message: "Enter a valid email",
+      });
+    }
+
+    if (!/^[6-9]\d{9}$/.test(mentor.mobile)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["mobile"],
+        message: "Enter a valid 10-digit mobile number",
+      });
+    }
+
+    if (!departments.includes(mentor.department as any)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["department"],
+        message: "Select a department",
+      });
+    }
+  }),
   })
   .superRefine((data, ctx) => {
     const allPeople = [data.leader, ...data.members];
@@ -126,7 +166,7 @@ const steps = [
   { label: "Team", hint: "Problem statement & category" },
   { label: "Leader", hint: "Single point of contact" },
   { label: "Members", hint: "Members 2 to 6" },
-  { label: "Mentor", hint: "Faculty guide" },
+  { label: "Mentor", hint: "Optional" },
   { label: "Review", hint: "Confirm & submit" },
 ];
 
@@ -276,9 +316,8 @@ function RegisterPage() {
             Register your <span className="text-gradient">team</span>
           </h1>
           <p className="mt-4 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg">
-            Five steps, nothing submitted until you confirm on the review page. Exactly 6 members,
-            at least one female member, all from NMIET, plus one faculty mentor.
-          </p>
+  Five simple steps. Nothing is submitted until you confirm on the review page. Register a team of 6 NMIET students with at least one female member. Faculty mentor details are optional during registration.
+</p>
         </motion.div>
 
         <Stepper step={step} onSelect={goTo} progressPct={progressPct} />
@@ -806,9 +845,8 @@ function Review({
       <div className="mt-6 flex gap-3 rounded-3xl border border-border bg-accent/40 p-4">
         <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-brand-green" aria-hidden />
         <p className="text-sm leading-relaxed text-muted-foreground">
-          Confirm your team has exactly 6 members with at least one female member, all from NMIET,
-          and one faculty mentor.
-        </p>
+  Confirm your team has exactly 6 NMIET student members, including at least one female member. Faculty mentor details are optional during registration.
+</p>
       </div>
 
       <div className="mt-7 grid gap-4 sm:grid-cols-2">

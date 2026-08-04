@@ -134,7 +134,7 @@ export function Hero() {
               </dt>
               <dd className="mt-1.5 font-display text-xl font-semibold">6 members</dd>
               <p className="mt-1.5 text-[0.7rem] leading-snug text-muted-foreground">
-                1 faculty mentor · at least 1 female member
+                at least 1 female member
               </p>
             </div>
           </motion.dl>

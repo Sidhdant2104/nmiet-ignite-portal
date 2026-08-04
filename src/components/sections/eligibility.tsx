@@ -29,7 +29,7 @@ const cards = [
   {
     icon: GraduationCap,
     title: "1 faculty mentor",
-    body: "Every team must have one faculty mentor who guides the team and verifies the submission.",
+    body: "Each team may have one faculty mentor (optional)",
     tone: "text-primary",
     bg: "bg-primary-soft",
   },
