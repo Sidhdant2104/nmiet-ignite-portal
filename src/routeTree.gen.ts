@@ -16,6 +16,14 @@ import { Route as PreviousYearsRouteImport } from './routes/previous-years'
 import { Route as ProblemStatementsRouteImport } from './routes/problem-statements'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as ThemesRouteImport } from './routes/themes'
+import { Route as AdminIndexRouteImport } from './routes/admin/index'
+import { Route as AdminActivityRouteImport } from './routes/admin/activity'
+import { Route as AdminAnnouncementsRouteImport } from './routes/admin/announcements'
+import { Route as AdminDashboardRouteImport } from './routes/admin/dashboard'
+import { Route as AdminEmailRouteImport } from './routes/admin/email'
+import { Route as AdminLoginRouteImport } from './routes/admin/login'
+import { Route as AdminPptRouteImport } from './routes/admin/ppt'
+import { Route as AdminRegistrationsRouteImport } from './routes/admin/registrations'
 import { Route as ApiAnnouncementsRouteImport } from './routes/api/announcements'
 import { Route as ApiProblemStatementsRouteImport } from './routes/api/problem-statements'
 import { Route as ApiRegisterRouteImport } from './routes/api/register'
@@ -56,6 +64,46 @@ const ThemesRoute = ThemesRouteImport.update({
   path: '/themes',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/admin/',
+  path: '/admin/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminActivityRoute = AdminActivityRouteImport.update({
+  id: '/admin/activity',
+  path: '/admin/activity',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminAnnouncementsRoute = AdminAnnouncementsRouteImport.update({
+  id: '/admin/announcements',
+  path: '/admin/announcements',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminDashboardRoute = AdminDashboardRouteImport.update({
+  id: '/admin/dashboard',
+  path: '/admin/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminEmailRoute = AdminEmailRouteImport.update({
+  id: '/admin/email',
+  path: '/admin/email',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminLoginRoute = AdminLoginRouteImport.update({
+  id: '/admin/login',
+  path: '/admin/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminPptRoute = AdminPptRouteImport.update({
+  id: '/admin/ppt',
+  path: '/admin/ppt',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRegistrationsRoute = AdminRegistrationsRouteImport.update({
+  id: '/admin/registrations',
+  path: '/admin/registrations',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAnnouncementsRoute = ApiAnnouncementsRouteImport.update({
   id: '/api/announcements',
   path: '/api/announcements',
@@ -85,10 +133,18 @@ export interface FileRoutesByFullPath {
   '/problem-statements': typeof ProblemStatementsRoute
   '/register': typeof RegisterRoute
   '/themes': typeof ThemesRoute
+  '/admin/activity': typeof AdminActivityRoute
+  '/admin/announcements': typeof AdminAnnouncementsRoute
+  '/admin/dashboard': typeof AdminDashboardRoute
+  '/admin/email': typeof AdminEmailRoute
+  '/admin/login': typeof AdminLoginRoute
+  '/admin/ppt': typeof AdminPptRoute
+  '/admin/registrations': typeof AdminRegistrationsRoute
   '/api/announcements': typeof ApiAnnouncementsRoute
   '/api/problem-statements': typeof ApiProblemStatementsRoute
   '/api/register': typeof ApiRegisterRoute
   '/api/themes': typeof ApiThemesRoute
+  '/admin/': typeof AdminIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -98,10 +154,18 @@ export interface FileRoutesByTo {
   '/problem-statements': typeof ProblemStatementsRoute
   '/register': typeof RegisterRoute
   '/themes': typeof ThemesRoute
+  '/admin/activity': typeof AdminActivityRoute
+  '/admin/announcements': typeof AdminAnnouncementsRoute
+  '/admin/dashboard': typeof AdminDashboardRoute
+  '/admin/email': typeof AdminEmailRoute
+  '/admin/login': typeof AdminLoginRoute
+  '/admin/ppt': typeof AdminPptRoute
+  '/admin/registrations': typeof AdminRegistrationsRoute
   '/api/announcements': typeof ApiAnnouncementsRoute
   '/api/problem-statements': typeof ApiProblemStatementsRoute
   '/api/register': typeof ApiRegisterRoute
   '/api/themes': typeof ApiThemesRoute
+  '/admin': typeof AdminIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -112,10 +176,18 @@ export interface FileRoutesById {
   '/problem-statements': typeof ProblemStatementsRoute
   '/register': typeof RegisterRoute
   '/themes': typeof ThemesRoute
+  '/admin/activity': typeof AdminActivityRoute
+  '/admin/announcements': typeof AdminAnnouncementsRoute
+  '/admin/dashboard': typeof AdminDashboardRoute
+  '/admin/email': typeof AdminEmailRoute
+  '/admin/login': typeof AdminLoginRoute
+  '/admin/ppt': typeof AdminPptRoute
+  '/admin/registrations': typeof AdminRegistrationsRoute
   '/api/announcements': typeof ApiAnnouncementsRoute
   '/api/problem-statements': typeof ApiProblemStatementsRoute
   '/api/register': typeof ApiRegisterRoute
   '/api/themes': typeof ApiThemesRoute
+  '/admin/': typeof AdminIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -127,10 +199,18 @@ export interface FileRouteTypes {
     | '/problem-statements'
     | '/register'
     | '/themes'
+    | '/admin/activity'
+    | '/admin/announcements'
+    | '/admin/dashboard'
+    | '/admin/email'
+    | '/admin/login'
+    | '/admin/ppt'
+    | '/admin/registrations'
     | '/api/announcements'
     | '/api/problem-statements'
     | '/api/register'
     | '/api/themes'
+    | '/admin/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -140,10 +220,18 @@ export interface FileRouteTypes {
     | '/problem-statements'
     | '/register'
     | '/themes'
+    | '/admin/activity'
+    | '/admin/announcements'
+    | '/admin/dashboard'
+    | '/admin/email'
+    | '/admin/login'
+    | '/admin/ppt'
+    | '/admin/registrations'
     | '/api/announcements'
     | '/api/problem-statements'
     | '/api/register'
     | '/api/themes'
+    | '/admin'
   id:
     | '__root__'
     | '/'
@@ -153,10 +241,18 @@ export interface FileRouteTypes {
     | '/problem-statements'
     | '/register'
     | '/themes'
+    | '/admin/activity'
+    | '/admin/announcements'
+    | '/admin/dashboard'
+    | '/admin/email'
+    | '/admin/login'
+    | '/admin/ppt'
+    | '/admin/registrations'
     | '/api/announcements'
     | '/api/problem-statements'
     | '/api/register'
     | '/api/themes'
+    | '/admin/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -167,10 +263,18 @@ export interface RootRouteChildren {
   ProblemStatementsRoute: typeof ProblemStatementsRoute
   RegisterRoute: typeof RegisterRoute
   ThemesRoute: typeof ThemesRoute
+  AdminActivityRoute: typeof AdminActivityRoute
+  AdminAnnouncementsRoute: typeof AdminAnnouncementsRoute
+  AdminDashboardRoute: typeof AdminDashboardRoute
+  AdminEmailRoute: typeof AdminEmailRoute
+  AdminLoginRoute: typeof AdminLoginRoute
+  AdminPptRoute: typeof AdminPptRoute
+  AdminRegistrationsRoute: typeof AdminRegistrationsRoute
   ApiAnnouncementsRoute: typeof ApiAnnouncementsRoute
   ApiProblemStatementsRoute: typeof ApiProblemStatementsRoute
   ApiRegisterRoute: typeof ApiRegisterRoute
   ApiThemesRoute: typeof ApiThemesRoute
+  AdminIndexRoute: typeof AdminIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -224,6 +328,62 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ThemesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/': {
+      id: '/admin/'
+      path: '/admin'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/activity': {
+      id: '/admin/activity'
+      path: '/admin/activity'
+      fullPath: '/admin/activity'
+      preLoaderRoute: typeof AdminActivityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/announcements': {
+      id: '/admin/announcements'
+      path: '/admin/announcements'
+      fullPath: '/admin/announcements'
+      preLoaderRoute: typeof AdminAnnouncementsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/dashboard': {
+      id: '/admin/dashboard'
+      path: '/admin/dashboard'
+      fullPath: '/admin/dashboard'
+      preLoaderRoute: typeof AdminDashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/email': {
+      id: '/admin/email'
+      path: '/admin/email'
+      fullPath: '/admin/email'
+      preLoaderRoute: typeof AdminEmailRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/login': {
+      id: '/admin/login'
+      path: '/admin/login'
+      fullPath: '/admin/login'
+      preLoaderRoute: typeof AdminLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/ppt': {
+      id: '/admin/ppt'
+      path: '/admin/ppt'
+      fullPath: '/admin/ppt'
+      preLoaderRoute: typeof AdminPptRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/registrations': {
+      id: '/admin/registrations'
+      path: '/admin/registrations'
+      fullPath: '/admin/registrations'
+      preLoaderRoute: typeof AdminRegistrationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/announcements': {
       id: '/api/announcements'
       path: '/api/announcements'
@@ -263,10 +423,18 @@ const rootRouteChildren: RootRouteChildren = {
   ProblemStatementsRoute: ProblemStatementsRoute,
   RegisterRoute: RegisterRoute,
   ThemesRoute: ThemesRoute,
+  AdminActivityRoute: AdminActivityRoute,
+  AdminAnnouncementsRoute: AdminAnnouncementsRoute,
+  AdminDashboardRoute: AdminDashboardRoute,
+  AdminEmailRoute: AdminEmailRoute,
+  AdminLoginRoute: AdminLoginRoute,
+  AdminPptRoute: AdminPptRoute,
+  AdminRegistrationsRoute: AdminRegistrationsRoute,
   ApiAnnouncementsRoute: ApiAnnouncementsRoute,
   ApiProblemStatementsRoute: ApiProblemStatementsRoute,
   ApiRegisterRoute: ApiRegisterRoute,
   ApiThemesRoute: ApiThemesRoute,
+  AdminIndexRoute: AdminIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

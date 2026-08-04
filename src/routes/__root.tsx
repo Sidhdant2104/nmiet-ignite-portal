@@ -7,6 +7,7 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
+  useRouterState,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
@@ -154,22 +155,17 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const intro = useIntroAnimation();
+  const isAdmin = useRouterState({ select: (state) => state.location.pathname.startsWith("/admin") });
 
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <AnimatePresence>
-          {intro.shouldPlay && (
-            <IntroAnimation onComplete={intro.complete} />
-          )}
-        </AnimatePresence>
+        {!isAdmin && <AnimatePresence>{intro.shouldPlay && <IntroAnimation onComplete={intro.complete} />}</AnimatePresence>}
 
         <div className="flex min-h-dvh flex-col">
-          <Navbar />
-          <main className="flex-1">
-            <Outlet />
-          </main>
-          <Footer />
+          {!isAdmin && <Navbar />}
+          <main className="flex-1"><Outlet /></main>
+          {!isAdmin && <Footer />}
         </div>
 
         <Toaster />
