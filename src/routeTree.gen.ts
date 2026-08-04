@@ -24,6 +24,7 @@ import { Route as AdminEmailRouteImport } from './routes/admin/email'
 import { Route as AdminLoginRouteImport } from './routes/admin/login'
 import { Route as AdminPptRouteImport } from './routes/admin/ppt'
 import { Route as AdminRegistrationsRouteImport } from './routes/admin/registrations'
+import { Route as AdminUsersRouteImport } from './routes/admin/users'
 import { Route as ApiAnnouncementsRouteImport } from './routes/api/announcements'
 import { Route as ApiProblemStatementsRouteImport } from './routes/api/problem-statements'
 import { Route as ApiRegisterRouteImport } from './routes/api/register'
@@ -105,6 +106,11 @@ const AdminRegistrationsRoute = AdminRegistrationsRouteImport.update({
   path: '/admin/registrations',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminUsersRoute = AdminUsersRouteImport.update({
+  id: '/admin/users',
+  path: '/admin/users',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAnnouncementsRoute = ApiAnnouncementsRouteImport.update({
   id: '/api/announcements',
   path: '/api/announcements',
@@ -146,6 +152,7 @@ export interface FileRoutesByFullPath {
   '/admin/login': typeof AdminLoginRoute
   '/admin/ppt': typeof AdminPptRoute
   '/admin/registrations': typeof AdminRegistrationsRouteWithChildren
+  '/admin/users': typeof AdminUsersRoute
   '/api/announcements': typeof ApiAnnouncementsRoute
   '/api/problem-statements': typeof ApiProblemStatementsRoute
   '/api/register': typeof ApiRegisterRoute
@@ -168,6 +175,7 @@ export interface FileRoutesByTo {
   '/admin/login': typeof AdminLoginRoute
   '/admin/ppt': typeof AdminPptRoute
   '/admin/registrations': typeof AdminRegistrationsRouteWithChildren
+  '/admin/users': typeof AdminUsersRoute
   '/api/announcements': typeof ApiAnnouncementsRoute
   '/api/problem-statements': typeof ApiProblemStatementsRoute
   '/api/register': typeof ApiRegisterRoute
@@ -191,6 +199,7 @@ export interface FileRoutesById {
   '/admin/login': typeof AdminLoginRoute
   '/admin/ppt': typeof AdminPptRoute
   '/admin/registrations': typeof AdminRegistrationsRouteWithChildren
+  '/admin/users': typeof AdminUsersRoute
   '/api/announcements': typeof ApiAnnouncementsRoute
   '/api/problem-statements': typeof ApiProblemStatementsRoute
   '/api/register': typeof ApiRegisterRoute
@@ -215,6 +224,7 @@ export interface FileRouteTypes {
     | '/admin/login'
     | '/admin/ppt'
     | '/admin/registrations'
+    | '/admin/users'
     | '/api/announcements'
     | '/api/problem-statements'
     | '/api/register'
@@ -237,6 +247,7 @@ export interface FileRouteTypes {
     | '/admin/login'
     | '/admin/ppt'
     | '/admin/registrations'
+    | '/admin/users'
     | '/api/announcements'
     | '/api/problem-statements'
     | '/api/register'
@@ -259,6 +270,7 @@ export interface FileRouteTypes {
     | '/admin/login'
     | '/admin/ppt'
     | '/admin/registrations'
+    | '/admin/users'
     | '/api/announcements'
     | '/api/problem-statements'
     | '/api/register'
@@ -282,6 +294,7 @@ export interface RootRouteChildren {
   AdminLoginRoute: typeof AdminLoginRoute
   AdminPptRoute: typeof AdminPptRoute
   AdminRegistrationsRoute: typeof AdminRegistrationsRouteWithChildren
+  AdminUsersRoute: typeof AdminUsersRoute
   ApiAnnouncementsRoute: typeof ApiAnnouncementsRoute
   ApiProblemStatementsRoute: typeof ApiProblemStatementsRoute
   ApiRegisterRoute: typeof ApiRegisterRoute
@@ -396,6 +409,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminRegistrationsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/users': {
+      id: '/admin/users'
+      path: '/admin/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AdminUsersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/announcements': {
       id: '/api/announcements'
       path: '/api/announcements'
@@ -460,6 +480,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminLoginRoute: AdminLoginRoute,
   AdminPptRoute: AdminPptRoute,
   AdminRegistrationsRoute: AdminRegistrationsRouteWithChildren,
+  AdminUsersRoute: AdminUsersRoute,
   ApiAnnouncementsRoute: ApiAnnouncementsRoute,
   ApiProblemStatementsRoute: ApiProblemStatementsRoute,
   ApiRegisterRoute: ApiRegisterRoute,

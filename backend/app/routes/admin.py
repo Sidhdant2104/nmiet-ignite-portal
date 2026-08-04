@@ -12,20 +12,24 @@ import bcrypt
 import jwt
 from bson import ObjectId
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
+from fastapi.responses import StreamingResponse
+from io import BytesIO, StringIO
+import csv
+from openpyxl import Workbook
 from pydantic import BaseModel, EmailStr, Field
 
 from app.config import ADMIN_BOOTSTRAP_EMAIL, ADMIN_BOOTSTRAP_PASSWORD_HASH, ADMIN_JWT_SECRET
 from app.mongodb import admin_users_collection, announcement_collection, audit_collection, registration_collection
 
 router = APIRouter(prefix="/admin", tags=["Administration"])
-Role = Literal["super_admin", "faculty", "judge", "iic_member"]
+Role = Literal["super_admin", "faculty", "student_spoc", "student_coordinator"]
 COOKIE_NAME = "nmiet_admin_session"
 
 ROLE_PERMISSIONS = {
-    "super_admin": {"manage_registrations", "manage_announcements", "send_email", "score"},
-    "faculty": {"manage_registrations"},
-    "judge": {"score"},
-    "iic_member": {"manage_announcements", "send_email"},
+    "super_admin": {"manage_registrations", "delete_registrations", "manage_announcements", "send_email", "manage_users", "export", "view_dashboard", "view_activity"},
+    "faculty": {"manage_registrations", "export", "view_dashboard"},
+    "student_spoc": {"manage_registrations", "view_dashboard", "export"},
+    "student_coordinator": {"view_dashboard"},
 }
 
 class LoginPayload(BaseModel):
@@ -47,6 +51,23 @@ class AnnouncementPayload(BaseModel):
     is_published: bool = True
     scheduled_for: Optional[datetime] = None
     expires_at: Optional[datetime] = None
+
+class AdminUserPayload(BaseModel):
+    name: str = Field(min_length=2, max_length=80)
+    email: EmailStr
+    role: Role
+    password: Optional[str] = Field(default=None, min_length=8, max_length=256)
+    is_active: bool = True
+
+class BulkRegistrationPayload(BaseModel):
+    ids: list[str] = Field(min_length=1, max_length=500)
+    action: Literal["delete", "restore", "status"]
+    status: Optional[Literal["Registered", "PPT Submitted", "Under Review", "Shortlisted", "Rejected", "Qualified"]] = None
+
+class InvitePayload(BaseModel):
+    name: str = Field(min_length=2, max_length=80)
+    email: EmailStr
+    role: Role
 
 def _secret() -> str:
     if not ADMIN_JWT_SECRET or len(ADMIN_JWT_SECRET) < 32:
@@ -96,6 +117,73 @@ async def csrf_guard(request: Request):
 
 async def audit(user: dict, action: str, registration_id: Optional[str] = None, detail: Optional[str] = None):
     await audit_collection.insert_one({"admin_id": user["_id"], "admin_name": user.get("name", user["email"]), "action": action, "registration_id": registration_id, "detail": detail, "timestamp": datetime.now(timezone.utc)})
+
+def safe_user(user: dict):
+    return {"_id": str(user["_id"]), "name": user.get("name"), "email": user["email"], "role": user["role"], "is_active": user.get("is_active", True), "created_at": user.get("created_at")}
+
+@router.get("/users")
+async def users(search: Optional[str] = None, user=Depends(require("manage_users"))):
+    query = {"is_deleted": {"$ne": True}}
+    if search: query["$or"] = [{"name": {"$regex": search, "$options": "i"}}, {"email": {"$regex": search, "$options": "i"}}, {"role": {"$regex": search, "$options": "i"}}]
+    result=[]
+    async for item in admin_users_collection.find(query).sort("created_at", -1): result.append(safe_user(item))
+    return {"data": result}
+
+@router.post("/users", dependencies=[Depends(csrf_guard)])
+async def create_user(payload: AdminUserPayload, user=Depends(require("manage_users"))):
+    if await admin_users_collection.find_one({"email": payload.email.lower(), "is_deleted": {"$ne": True}}): raise HTTPException(409, "An admin with this email already exists.")
+    if not payload.password: raise HTTPException(422, "Use the invitation workflow to set the password.")
+    item=payload.model_dump(); item["email"]=item["email"].lower(); item["password_hash"]=bcrypt.hashpw(item.pop("password").encode(),bcrypt.gensalt()).decode(); item["created_at"]=datetime.now(timezone.utc)
+    result=await admin_users_collection.insert_one(item); await audit(user,"Created Admin",detail=item["email"]); return {"id":str(result.inserted_id)}
+
+@router.patch("/users/{user_id}", dependencies=[Depends(csrf_guard)])
+async def update_user(user_id: str, payload: AdminUserPayload, user=Depends(require("manage_users"))):
+    data=payload.model_dump(exclude={"password"});
+    if payload.password: data["password_hash"]=bcrypt.hashpw(payload.password.encode(),bcrypt.gensalt()).decode()
+    result=await admin_users_collection.update_one({"_id":ObjectId(user_id),"is_deleted":{"$ne":True}},{"$set":data})
+    if not result.matched_count: raise HTTPException(404,"Admin not found.")
+    await audit(user,"Changed role" if "role" in data else "Updated Admin",detail=payload.email); return {"success":True}
+
+@router.delete("/users/{user_id}", dependencies=[Depends(csrf_guard)])
+async def delete_user(user_id: str, user=Depends(require("manage_users"))):
+    if user_id==user["_id"]: raise HTTPException(400,"You cannot delete your own account.")
+    result=await admin_users_collection.update_one({"_id":ObjectId(user_id)},{"$set":{"is_deleted":True,"is_active":False,"deleted_at":datetime.now(timezone.utc)}})
+    if not result.matched_count: raise HTTPException(404,"Admin not found.")
+    await audit(user,"Deleted Admin",detail=user_id); return {"success":True}
+
+@router.post("/users/invite", dependencies=[Depends(csrf_guard)])
+async def invite_user(payload: InvitePayload, request: Request, user=Depends(require("manage_users"))):
+    if await admin_users_collection.find_one({"email": payload.email.lower(), "is_deleted": {"$ne": True}}): raise HTTPException(409,"An admin with this email already exists.")
+    token=jwt.encode({"email":payload.email.lower(),"name":payload.name,"role":payload.role,"purpose":"admin_invite","exp":datetime.now(timezone.utc)+timedelta(hours=24)},_secret(),algorithm="HS256")
+    await admin_users_collection.insert_one({"name":payload.name,"email":payload.email.lower(),"role":payload.role,"is_active":False,"invite_token":token,"invite_expires_at":datetime.now(timezone.utc)+timedelta(hours=24),"created_at":datetime.now(timezone.utc)})
+    await audit(user,"Invited Admin",detail=payload.email)
+    return {"invite_url":f"{request.headers.get('origin','')}/admin/accept-invite?token={token}","expires_in_hours":24}
+
+@router.post("/registrations/bulk", dependencies=[Depends(csrf_guard)])
+async def bulk_registrations(payload: BulkRegistrationPayload, user=Depends(require("manage_registrations"))):
+    ids=[ObjectId(value) for value in payload.ids]
+    if payload.action=="delete":
+        if "delete_registrations" not in ROLE_PERMISSIONS.get(user["role"],set()): raise HTTPException(403,"You do not have permission to delete registrations.")
+        await registration_collection.update_many({"_id":{"$in":ids}},{"$set":{"isDeleted":True,"deleted_at":datetime.now(timezone.utc),"deleted_by":user["_id"]}})
+    elif payload.action=="restore": await registration_collection.update_many({"_id":{"$in":ids}},{"$set":{"isDeleted":False}})
+    elif payload.action=="status":
+        if not payload.status: raise HTTPException(422,"Status is required.")
+        await registration_collection.update_many({"_id":{"$in":ids}},{"$set":{"status":payload.status,"updated_at":datetime.now(timezone.utc)}})
+    await audit(user,f"Bulk {payload.action.title()} Registrations",detail=f"{len(ids)} registrations")
+    return {"success":True,"count":len(ids)}
+
+@router.get("/registrations/export")
+async def export_registrations(format: Literal["csv","xlsx"]="csv", user=Depends(require("export"))):
+    rows=[]
+    async for r in registration_collection.find({"isDeleted":{"$ne":True}}):
+        members=r.get("members",[]); rows.append([r.get("created_at",""),r.get("status","Registered"),r.get("team",{}).get("teamName",""),r.get("team",{}).get("psId",""),r.get("team",{}).get("theme",""),r.get("team",{}).get("category",""),r.get("leader",{}).get("name",""),r.get("leader",{}).get("email",""),r.get("leader",{}).get("mobile",""),r.get("mentor",{}).get("name","") if r.get("mentor") else "",r.get("leader",{}).get("department",""),r.get("leader",{}).get("department",""),r.get("leader",{}).get("year",""),*[m.get("name","") for m in members[:5]],r.get("remarks","")])
+    header=["Registration Date","Status","Team Name","PS ID","Theme","Category","Leader Name","Leader Email","Leader Phone","Faculty","Institute","Department","Year","Member 1","Member 2","Member 3","Member 4","Member 5","Remarks"]
+    while rows and len(rows[0])<len(header): rows[0].append("")
+    filename=f"registrations-{datetime.now().date()}.{format}"
+    await audit(user,f"Exported {format.upper()}",detail=filename)
+    if format=="csv":
+        stream=StringIO(); writer=csv.writer(stream); writer.writerow(header); writer.writerows([row+['']*(len(header)-len(row)) for row in rows]); return Response(stream.getvalue(),media_type="text/csv",headers={"Content-Disposition":f'attachment; filename="{filename}"'})
+    wb=Workbook(); ws=wb.active; ws.append(header); [ws.append(row+['']*(len(header)-len(row))) for row in rows]; out=BytesIO(); wb.save(out); return StreamingResponse(BytesIO(out.getvalue()),media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",headers={"Content-Disposition":f'attachment; filename="{filename}"'})
 
 @router.post("/auth/login", dependencies=[Depends(csrf_guard)])
 async def login(data: LoginPayload, response: Response):
