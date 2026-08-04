@@ -44,6 +44,7 @@ class AnnouncementPayload(BaseModel):
     title: str = Field(min_length=3, max_length=140)
     body: str = Field(min_length=1, max_length=5000)
     is_pinned: bool = False
+    is_published: bool = True
     scheduled_for: Optional[datetime] = None
     expires_at: Optional[datetime] = None
 
@@ -124,16 +125,28 @@ async def dashboard(user=Depends(current_admin)):
     latest = []
     async for item in registration_collection.find(base).sort("created_at", -1).limit(6):
         item["_id"] = str(item["_id"]); latest.append(item)
-    return {"metrics": {"total": total, "software": await count({"team.category": "Software"}), "hardware": await count({"team.category": "Hardware"}), "ppt_submitted": await count({"status": "PPT Submitted"}), "pending_ppt": await count({"status": "Registered"}), "shortlisted": await count({"status": "Shortlisted"}), "rejected": await count({"status": "Rejected"}), "qualified": await count({"status": "Qualified"})}, "latest": latest}
+    statuses = ["Registered", "PPT Submitted", "Under Review", "Shortlisted", "Rejected", "Qualified"]
+    status_distribution = {status: await count({"status": status}) for status in statuses}
+    theme_distribution = []
+    async for item in registration_collection.aggregate([{"$match": base}, {"$group": {"_id": "$team.theme", "count": {"$sum": 1}}}, {"$sort": {"count": -1}}, {"$limit": 8}]):
+        theme_distribution.append({"theme": item["_id"] or "Unspecified", "count": item["count"]})
+    activity = []
+    async for item in audit_collection.find().sort("timestamp", -1).limit(6):
+        item["_id"] = str(item["_id"]); activity.append(item)
+    return {"metrics": {"total": total, "software": await count({"team.category": "Software"}), "hardware": await count({"team.category": "Hardware"}), "ppt_submitted": await count({"status": "PPT Submitted"}), "pending_ppt": await count({"status": "Registered"}), "shortlisted": await count({"status": "Shortlisted"}), "rejected": await count({"status": "Rejected"}), "qualified": await count({"status": "Qualified"})}, "status_distribution": status_distribution, "theme_distribution": theme_distribution, "latest": latest, "activity": activity}
 
 @router.get("/registrations")
-async def registrations(search: Optional[str] = None, status: Optional[str] = None, theme: Optional[str] = None, user=Depends(current_admin)):
-    query = {"isDeleted": {"$ne": True}}
+async def registrations(search: Optional[str] = None, status: Optional[str] = None, theme: Optional[str] = None, category: Optional[str] = None, date_from: Optional[datetime] = None, date_to: Optional[datetime] = None, include_deleted: bool = False, sort_by: str = "created_at", sort_order: int = -1, user=Depends(current_admin)):
+    query = {} if include_deleted else {"isDeleted": {"$ne": True}}
     if status: query["status"] = status
     if theme: query["team.theme"] = theme
-    if search: query["$or"] = [{"team.teamName": {"$regex": search, "$options": "i"}}, {"leader.name": {"$regex": search, "$options": "i"}}, {"team.psId": {"$regex": search, "$options": "i"}}]
+    if category: query["team.category"] = category
+    if date_from or date_to:
+        query["created_at"] = {**({"$gte": date_from} if date_from else {}), **({"$lte": date_to} if date_to else {})}
+    if search: query["$or"] = [{"team.teamName": {"$regex": search, "$options": "i"}}, {"leader.name": {"$regex": search, "$options": "i"}}, {"leader.email": {"$regex": search, "$options": "i"}}, {"team.psId": {"$regex": search, "$options": "i"}}]
+    safe_sort = sort_by if sort_by in {"created_at", "status", "team.teamName", "team.theme"} else "created_at"
     result = []
-    async for item in registration_collection.find(query).sort("created_at", -1): item["_id"] = str(item["_id"]); result.append(item)
+    async for item in registration_collection.find(query).sort(safe_sort, 1 if sort_order == 1 else -1): item["_id"] = str(item["_id"]); result.append(item)
     return {"data": result}
 
 @router.get("/registrations/{registration_id}")
@@ -148,19 +161,22 @@ async def update_registration(registration_id: str, payload: RegistrationPatch, 
     old = await registration_collection.find_one({"_id": ObjectId(registration_id), "isDeleted": {"$ne": True}})
     if not old: raise HTTPException(404, "Registration not found.")
     await registration_collection.update_one({"_id": old["_id"]}, {"$set": changes})
-    await audit(user, "Updated registration", registration_id, f"Status: {old.get('status', 'Registered')} → {changes.get('status', old.get('status', 'Registered'))}")
+    if "status" in changes and changes["status"] != old.get("status"):
+        await audit(user, "Changed Status", registration_id, f"{old.get('status', 'Registered')} → {changes['status']}")
+    else:
+        await audit(user, "Updated Registration", registration_id)
     return {"success": True}
 
 @router.delete("/registrations/{registration_id}", dependencies=[Depends(csrf_guard)])
 async def soft_delete(registration_id: str, user=Depends(require("manage_registrations"))):
     result = await registration_collection.update_one({"_id": ObjectId(registration_id), "isDeleted": {"$ne": True}}, {"$set": {"isDeleted": True, "deleted_at": datetime.now(timezone.utc), "deleted_by": user["_id"]}})
     if not result.matched_count: raise HTTPException(404, "Registration not found.")
-    await audit(user, "Soft-deleted registration", registration_id); return {"success": True}
+    await audit(user, "Deleted Registration", registration_id); return {"success": True}
 
 @router.post("/registrations/{registration_id}/restore", dependencies=[Depends(csrf_guard)])
 async def restore(registration_id: str, user=Depends(require("manage_registrations"))):
     await registration_collection.update_one({"_id": ObjectId(registration_id), "isDeleted": True}, {"$set": {"isDeleted": False}, "$unset": {"deleted_at": "", "deleted_by": ""}})
-    await audit(user, "Restored registration", registration_id); return {"success": True}
+    await audit(user, "Restored Registration", registration_id); return {"success": True}
 
 @router.get("/activity")
 async def activity(user=Depends(current_admin)):
