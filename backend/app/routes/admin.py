@@ -16,7 +16,7 @@ from fastapi.responses import StreamingResponse
 from io import BytesIO, StringIO
 import csv
 from openpyxl import Workbook
-from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from pydantic import BaseModel, EmailStr, Field
 
 from app.config import ADMIN_BOOTSTRAP_EMAIL, ADMIN_BOOTSTRAP_PASSWORD_HASH, ADMIN_JWT_SECRET
@@ -194,37 +194,90 @@ async def bulk_registrations(payload: BulkRegistrationPayload, user=Depends(requ
 
 @router.get("/registrations/export")
 async def export_registrations(format: Literal["csv","xlsx"]="csv", search: Optional[str] = None, status: Optional[str] = None, theme: Optional[str] = None, category: Optional[str] = None, date_from: Optional[datetime] = None, date_to: Optional[datetime] = None, include_deleted: bool = False, sort_by: str = "created_at", sort_order: int = -1, user=Depends(require("export"))):
-    header=["Registration Date","Team Name","PS ID","Theme","Category","Status","Leader Name","Leader Email","Leader Phone","Faculty Mentor","College","Department","Year","Team Members","Remarks"]
-    rows=[]
+    headers = ["Registration ID", "Registration Date", "Status", "Team Name", "PS ID", "Theme", "Category", "Leader Name", "Leader Email", "Leader Phone", "Leader Department", "Leader Year", "Faculty Name", "Faculty Email", "Faculty Phone"]
+    for index in range(1, 7):
+        headers.extend([f"Member {index} Name", f"Member {index} Email", f"Member {index} Phone", f"Member {index} Department", f"Member {index} Year"])
+    headers.append("Remarks")
     safe_sort = sort_by if sort_by in {"created_at", "status", "team.teamName", "team.theme"} else "created_at"
-    async for r in registration_collection.find(registration_query(search, status, theme, category, date_from, date_to, include_deleted)).sort(safe_sort, 1 if sort_order == 1 else -1):
-        team = r.get("team", {})
-        leader = r.get("leader", {})
-        mentor = r.get("mentor") or {}
-        members = r.get("members", [])
-        team_members = "; ".join(
-            " — ".join(filter(None, [member.get("name"), member.get("email"), member.get("mobile"), member.get("department"), member.get("year")]))
-            for member in members
-        )
-        rows.append([
-            r.get("created_at").astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M UTC") if isinstance(r.get("created_at"), datetime) else r.get("created_at", ""), team.get("teamName", ""), team.get("psId", ""), team.get("theme", ""), team.get("category", ""), r.get("status", "Registered"),
-            leader.get("name", ""), leader.get("email", ""), leader.get("mobile", ""), mentor.get("name", ""), leader.get("college") or leader.get("institute", ""), leader.get("department", ""), leader.get("year", ""), team_members, r.get("remarks", ""),
-        ])
+    registrations = []
+    async for registration in registration_collection.find(registration_query(search, status, theme, category, date_from, date_to, include_deleted)).sort(safe_sort, 1 if sort_order == 1 else -1):
+        registrations.append(registration)
+
+    def created_at(value, for_excel=False):
+        if not isinstance(value, datetime):
+            return value or ""
+        normalized = value.astimezone(timezone.utc).replace(tzinfo=None) if value.tzinfo else value
+        return normalized if for_excel else normalized.strftime("%Y-%m-%d %H:%M UTC")
+
+    def registration_row(registration, for_excel=False):
+        team, leader, mentor = registration.get("team", {}), registration.get("leader", {}), registration.get("mentor") or {}
+        row = [registration.get("registration_id") or str(registration.get("_id", "")), created_at(registration.get("created_at"), for_excel), registration.get("status", "Registered"), team.get("teamName", ""), team.get("psId", ""), team.get("theme", ""), team.get("category", ""), leader.get("name", ""), leader.get("email", ""), leader.get("mobile", ""), leader.get("department", ""), leader.get("year", ""), mentor.get("name", ""), mentor.get("email", ""), mentor.get("mobile", "")]
+        for member in registration.get("members", [])[:6]:
+            row.extend([member.get("name", ""), member.get("email", ""), member.get("mobile", ""), member.get("department", ""), member.get("year", "")])
+        row.extend([""] * (30 - len(row) + 15))
+        row.append(registration.get("remarks", ""))
+        return row
+
+    def apply_sheet_style(sheet, status_column=None, date_column=None):
+        thin = Side(style="thin", color="D1D5DB")
+        for cell in sheet[1]:
+            cell.font = Font(bold=True, color="FFFFFF")
+            cell.fill = PatternFill("solid", fgColor="F97316")
+            cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+            cell.border = Border(top=thin, bottom=thin, left=thin, right=thin)
+        for row_index, row in enumerate(sheet.iter_rows(min_row=2), start=2):
+            fill = PatternFill("solid", fgColor="FFF7ED") if row_index % 2 == 0 else None
+            for cell in row:
+                cell.alignment = Alignment(vertical="top", wrap_text=True)
+                cell.border = Border(top=thin, bottom=thin, left=thin, right=thin)
+                if fill:
+                    cell.fill = fill
+        if status_column:
+            for cell in sheet[status_column][1:]:
+                cell.alignment = Alignment(horizontal="center", vertical="top", wrap_text=True)
+        if date_column:
+            for cell in sheet[date_column][1:]:
+                cell.number_format = "yyyy-mm-dd hh:mm"
+        sheet.freeze_panes = "A2"
+        sheet.auto_filter.ref = sheet.dimensions
+        for column in sheet.columns:
+            sheet.column_dimensions[column[0].column_letter].width = min(max(len(str(cell.value or "")) for cell in column) + 2, 36)
+
     filename=f"registrations-{datetime.now().date()}.{format}"
     await audit(user,f"Exported {format.upper()}",detail=filename)
     if format=="csv":
-        stream=StringIO(); writer=csv.writer(stream); writer.writerow(header); writer.writerows(rows); return Response(stream.getvalue(),media_type="text/csv",headers={"Content-Disposition":f'attachment; filename="{filename}"'})
-    wb=Workbook(); ws=wb.active; ws.title="Registrations"; ws.freeze_panes="A2"; ws.append(header)
-    for cell in ws[1]:
-        cell.font = Font(bold=True)
-        cell.fill = PatternFill("solid", fgColor="E5E7EB")
-        cell.alignment = Alignment(horizontal="center")
-    for row in rows:
-        ws.append(row)
-    for column in ws.columns:
-        letter = column[0].column_letter
-        ws.column_dimensions[letter].width = min(max(len(str(cell.value or "")) for cell in column) + 2, 60)
-    out=BytesIO(); wb.save(out); out.seek(0); return StreamingResponse(out,media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",headers={"Content-Disposition":f'attachment; filename="{filename}"'})
+        stream=StringIO(); writer=csv.writer(stream); writer.writerow(headers); writer.writerows(registration_row(registration) for registration in registrations); return Response("\ufeff" + stream.getvalue(),media_type="text/csv; charset=utf-8",headers={"Content-Disposition":f'attachment; filename="{filename}"'})
+
+    workbook = Workbook()
+    registrations_sheet = workbook.active
+    registrations_sheet.title = "Registrations"
+    registrations_sheet.append(headers)
+    for registration in registrations:
+        registrations_sheet.append(registration_row(registration, True))
+    apply_sheet_style(registrations_sheet, status_column="C", date_column="B")
+
+    members_sheet = workbook.create_sheet("Team Members")
+    members_sheet.append(["Registration ID", "Team Name", "PS ID", "Role", "Name", "Email", "Phone", "Department", "Year"])
+    for registration in registrations:
+        team, leader = registration.get("team", {}), registration.get("leader", {})
+        base = [registration.get("registration_id") or str(registration.get("_id", "")), team.get("teamName", ""), team.get("psId", "")]
+        members_sheet.append(base + ["Leader", leader.get("name", ""), leader.get("email", ""), leader.get("mobile", ""), leader.get("department", ""), leader.get("year", "")])
+        for index, member in enumerate(registration.get("members", []), start=1):
+            members_sheet.append(base + [f"Member {index}", member.get("name", ""), member.get("email", ""), member.get("mobile", ""), member.get("department", ""), member.get("year", "")])
+    apply_sheet_style(members_sheet)
+
+    summary_sheet = workbook.create_sheet("Summary")
+    active = [registration for registration in registrations if not registration.get("isDeleted", False)]
+    summary_sheet.append(["Metric", "Value"])
+    summary_values = [("Total Registrations", len(active)), ("Software Teams", sum(item.get("team", {}).get("category") == "Software" for item in active)), ("Hardware Teams", sum(item.get("team", {}).get("category") == "Hardware" for item in active))]
+    for status_name in ["Registered", "PPT Submitted", "Under Review", "Shortlisted", "Qualified", "Rejected"]:
+        summary_values.append((status_name, sum(item.get("status", "Registered") == status_name for item in active)))
+    summary_values.append(("Deleted", sum(item.get("isDeleted", False) for item in registrations)))
+    for row in summary_values:
+        summary_sheet.append(row)
+    apply_sheet_style(summary_sheet)
+
+    out=BytesIO(); workbook.save(out); out.seek(0); return StreamingResponse(out,media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",headers={"Content-Disposition":f'attachment; filename="{filename}"'})
 
 @router.post("/auth/login", dependencies=[Depends(csrf_guard)])
 async def login(data: LoginPayload, response: Response):
