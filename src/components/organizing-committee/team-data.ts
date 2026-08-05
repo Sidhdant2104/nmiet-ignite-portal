@@ -26,10 +26,12 @@ export type TeamPerson = {
   department?: string;
   designation?: string;
   description?: string;
+
 };
 
 export type FacultyMember = TeamPerson & {
   role: string;
+  quote: string;
 };
 
 export type StudentLeader = TeamPerson & {
@@ -61,10 +63,11 @@ export type OperationalTeam = {
 
 export const facultyLeadership: FacultyMember[] = [
   {
-    role: "Principal",
+    role: "Director",
     name: "Dr. Pramod Patil",
     photo: photo("dr-pramod-patil"),
     description: "Providing institutional leadership and vision for SIH 2026.",
+    quote: "Innovation begins when students are trusted to solve real problems. Smart India Hackathon is where ideas evolve into impact, and where tomorrow's engineers take their first step toward building the future.",
   },
   {
     role: "IIC Dean",
@@ -73,6 +76,7 @@ export const facultyLeadership: FacultyMember[] = [
     designation: "Professor",
     department: "Mechanical Engineering",
     description: "Leading innovation initiatives and faculty coordination for the hackathon.",
+    quote: "Ideas become meaningful only when transformed into solutions that benefit society. SIH provides every student the opportunity to convert imagination into innovation.",
   },
   {
     role: "SIH SPOC",
@@ -81,6 +85,7 @@ export const facultyLeadership: FacultyMember[] = [
     designation: "Professor",
     department: "ENTC Engineering",
     description: "Serving as the official Single Point of Contact for Smart India Hackathon.",
+    quote: "Every successful innovation starts with guidance, collaboration and persistence. Our role is to empower students to think boldly, build confidently and represent NMIET with excellence.",
   },
 ];
 
