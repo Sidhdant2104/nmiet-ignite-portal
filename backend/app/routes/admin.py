@@ -12,14 +12,16 @@ import bcrypt
 import jwt
 from bson import ObjectId
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
 from io import BytesIO, StringIO
 import csv
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from pydantic import BaseModel, EmailStr, Field
 
-from app.config import ADMIN_BOOTSTRAP_EMAIL, ADMIN_BOOTSTRAP_PASSWORD_HASH, ADMIN_JWT_SECRET, PORTAL_URL
+from app.config import ADMIN_BOOTSTRAP_EMAIL, ADMIN_BOOTSTRAP_PASSWORD_HASH, ADMIN_JWT_SECRET, PORTAL_URL, PPT_STORAGE_DIR
+from pathlib import Path
+from copy import deepcopy
 from app.mongodb import admin_users_collection, announcement_collection, audit_collection, registration_collection
 from app.routes.ppt import STATUS as PPT_STATUSES, log_email
 
@@ -132,7 +134,12 @@ def ppt_scope(user: dict):
     return {"isDeleted": {"$ne": True}, "$or": [{"coordinator_email": user["email"]}, {"team.coordinator_email": user["email"]}]}
 
 def serialize(item: dict):
-    item["_id"] = str(item["_id"]); return item
+    safe = deepcopy(item); safe["_id"] = str(safe["_id"])
+    for upload in safe.get("ppt", {}).get("history", []):
+        upload.pop("storage_key", None); upload.pop("storage_path", None)
+    current = safe.get("ppt", {}).get("current")
+    if current: current.pop("storage_key", None); current.pop("storage_path", None)
+    return safe
 
 def registration_query(search: Optional[str] = None, status: Optional[str] = None, theme: Optional[str] = None, category: Optional[str] = None, date_from: Optional[datetime] = None, date_to: Optional[datetime] = None, include_deleted: bool = False):
     query = {} if include_deleted else {"isDeleted": {"$ne": True}}
@@ -336,7 +343,7 @@ async def dashboard(user=Depends(current_admin)):
 async def ppt_submissions(user=Depends(require("review_ppt"))):
     results = []
     async for item in registration_collection.find(ppt_scope(user)).sort("ppt.current.uploaded_at", -1):
-        item["_id"] = str(item["_id"]); results.append(item)
+        results.append(serialize(item))
     return {"data": results}
 
 @router.get("/ppt/submissions/{registration_id}")
@@ -346,6 +353,35 @@ async def ppt_submission(registration_id: str, user=Depends(require("review_ppt"
     item = await registration_collection.find_one({"_id": object_id, **ppt_scope(user)})
     if not item: raise HTTPException(404, "Submission not found or not permitted.")
     return serialize(item)
+
+async def _ppt_file(registration_id: str, user: dict):
+    try: object_id = ObjectId(registration_id)
+    except Exception: raise HTTPException(400, "Invalid registration ID.")
+    item = await registration_collection.find_one({"_id": object_id, **ppt_scope(user)})
+    current = item.get("ppt", {}).get("current") if item else None
+    if not current: raise HTTPException(404, "PPT submission not found or not permitted.")
+    path = Path(PPT_STORAGE_DIR) / current.get("storage_key", current.get("file_name", ""))
+    if not path.is_file(): raise HTTPException(404, "The uploaded file is unavailable.")
+    return item, current, path
+
+@router.get("/ppt/{registration_id}")
+async def ppt_submission_compat(registration_id: str, user=Depends(require("review_ppt"))):
+    item, _, _ = await _ppt_file(registration_id, user)
+    return serialize(item)
+
+@router.get("/ppt/{registration_id}/download")
+async def ppt_download(registration_id: str, user=Depends(require("review_ppt"))):
+    item, current, path = await _ppt_file(registration_id, user)
+    await audit(user, "Downloaded PPT", registration_id, f"Version {current.get('version')}: {current.get('filename')}")
+    return FileResponse(path, media_type=current.get("content_type", "application/octet-stream"), filename=current.get("filename", "presentation"))
+
+@router.get("/ppt/{registration_id}/preview")
+async def ppt_preview(registration_id: str, user=Depends(require("review_ppt"))):
+    item, current, path = await _ppt_file(registration_id, user)
+    if current.get("file_type") != "pdf" and not str(current.get("filename", "")).lower().endswith(".pdf"):
+        raise HTTPException(422, "In-browser preview is available for PDF uploads. Download the original PPT/PPTX instead.")
+    await audit(user, "Previewed PPT", registration_id, f"Version {current.get('version')}: {current.get('filename')}")
+    return FileResponse(path, media_type="application/pdf", headers={"Content-Disposition": f'inline; filename="{current.get("filename", "presentation.pdf")}"'})
 
 @router.post("/ppt/submissions/{registration_id}/download/{version}")
 async def ppt_download_url(registration_id: str, version: int, request: Request, user=Depends(require("review_ppt"))):

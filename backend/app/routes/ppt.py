@@ -114,7 +114,7 @@ async def upload(file: UploadFile = File(...), authorization: Optional[str] = He
         target.unlink(missing_ok=True); raise
     now = datetime.now(timezone.utc); history = item.get("ppt", {}).get("history", []); version = len(history) + 1
     reason = "Resubmission" if history else "Initial submission"
-    entry = {"version": version, "filename": original, "storage_key": target.name, "content_type": file.content_type or "application/octet-stream", "size": size, "uploaded_at": now, "reason": reason, "status": "PPT Submitted"}
+    entry = {"version": version, "filename": original, "storage_key": target.name, "content_type": file.content_type or "application/octet-stream", "size": size, "uploaded_at": now, "reason": reason, "status": "PPT Submitted", "file_name": target.name, "original_file_name": original, "file_size": size, "file_type": ext.removeprefix("."), "upload_timestamp": now, "version_number": version, "uploaded_by": item.get("leader", {}).get("email"), "storage_path": target.name}
     current = {**entry, "last_modified": now, "reviewer_remarks": "", "internal_notes": ""}
     await registration_collection.update_one({"_id": item["_id"]}, {"$set": {"ppt": {"current": current, "history": [*history, entry]}, "status": "PPT Submitted", "updated_at": now}})
     await audit_collection.insert_one({"admin_id": "team", "admin_name": item.get("leader", {}).get("name", "Team leader"), "action": "Re-uploaded PPT" if version > 1 else "Uploaded PPT", "registration_id": str(item["_id"]), "detail": f"Version {version}: {original}", "timestamp": now})

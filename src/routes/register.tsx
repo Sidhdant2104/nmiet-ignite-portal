@@ -1009,6 +1009,19 @@ function SuccessScreen({ reference, values }: { reference: string; values: FormV
           ))}
         </div>
 
+        <section className="mt-14 text-left" aria-labelledby="next-steps-title">
+          <div className="text-center">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">Next steps</p>
+            <h2 id="next-steps-title" className="mt-2 font-display text-2xl font-semibold">Complete your submission journey</h2>
+            <p className="mx-auto mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">Your registration has been completed successfully. Complete the remaining steps before the submission deadline.</p>
+          </div>
+          <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {[{icon:"📥",title:"Download PPT Template",body:"Download the official NMIET SIH PPT template before preparing your presentation.",button:"Download Template",to:"/ppt-template"},{icon:"📖",title:"Submission Guidelines",body:"Read the presentation format, evaluation criteria, submission rules and important deadlines.",button:"View Guidelines",to:"/submission-guidelines"},{icon:"📤",title:"Submit PPT",body:"Upload your presentation before the deadline. Teams may replace their submission until the deadline closes.",button:"Submit PPT",to:"/ppt-submission"}].map((item,index)=><motion.article key={item.title} initial={{opacity:0,y:12}} animate={{opacity:1,y:0}} transition={{delay:0.35+index*.06}} className="flex min-h-60 flex-col rounded-3xl border border-border bg-card p-5 shadow-soft transition-transform duration-200 hover:-translate-y-1 hover:shadow-lift"><span className="text-2xl" aria-hidden>{item.icon}</span><h3 className="mt-4 font-display text-lg font-semibold">{item.title}</h3><p className="mt-2 text-sm leading-relaxed text-muted-foreground">{item.body}</p><Link to={item.to as "/ppt-template"} className="mt-auto pt-5"><MagneticButton className="w-full bg-primary px-4 py-2.5 text-primary-foreground hover:brightness-105">{item.button}</MagneticButton></Link></motion.article>)}
+          </div>
+          <div className="mt-5 flex gap-3 rounded-2xl border border-primary/20 bg-primary/10 p-4 text-sm"><CircleCheckBig className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden/><p className="leading-relaxed text-muted-foreground">A confirmation email has been sent to the Team Leader containing your Reference ID, important links and future instructions.</p></div>
+          <p className="mt-7 text-center text-sm text-muted-foreground">Need assistance? Email <a className="font-semibold text-primary hover:underline" href="mailto:sih@nmiet.edu.in">sih@nmiet.edu.in</a> or Contact the SIH Coordinator.</p>
+        </section>
+
         <div className="mt-10 flex flex-wrap justify-center gap-3">
           <MagneticButton
             type="button"
