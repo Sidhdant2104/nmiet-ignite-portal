@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 const primaryNavItems = [
   { label: "Home", href: "/#home" },
   { label: "About", href: "/#about" },
-  { label: "Themes", href: "/#themes" },
+  { label: "Themes", href: "/themes" },
   { label: "Problems", href: "/problem-statements" },
   { label: "Journey", href: "/previous-years" },
 ];
