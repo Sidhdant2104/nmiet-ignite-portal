@@ -52,6 +52,9 @@ function FacultyStory({ member, imageRight }: { member: FacultyMember; imageRigh
           viewport={{ once: true, margin: "-80px" }}
           transition={{ duration: 0.85, delay: 0.1, ease }}
         >
+          <blockquote className="font-display text-2xl font-medium leading-snug tracking-tight sm:text-3xl lg:text-[2rem] lg:leading-snug max-md:text-xl">
+            &ldquo;{member.quote}&rdquo;
+          </blockquote>
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-primary">
             {member.role}
           </p>
