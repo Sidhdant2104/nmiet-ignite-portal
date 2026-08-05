@@ -32,6 +32,7 @@ export type TeamPerson = {
 export type FacultyMember = TeamPerson & {
   role: string;
   quote: string;
+  message?: string[];
 };
 
 export type StudentLeader = TeamPerson & {
@@ -68,6 +69,11 @@ export const facultyLeadership: FacultyMember[] = [
     photo: photo("dr-pramod-patil"),
     description: "Providing institutional leadership and vision for SIH 2026.",
     quote: "Innovation begins when students are trusted to solve real problems. Smart India Hackathon is where ideas evolve into impact, and where tomorrow's engineers take their first step toward building the future.",
+    message: [
+      "Welcome to Smart India Hackathon 2026.",
+      "Innovation grows when curious minds are empowered to solve meaningful problems together.",
+      "I encourage every participant to think boldly, collaborate openly, and create solutions that leave a lasting impact for our communities.",
+    ],
   },
   {
     role: "IIC Dean",
@@ -77,15 +83,25 @@ export const facultyLeadership: FacultyMember[] = [
     department: "Mechanical Engineering",
     description: "Leading innovation initiatives and faculty coordination for the hackathon.",
     quote: "Ideas become meaningful only when transformed into solutions that benefit society. SIH provides every student the opportunity to convert imagination into innovation.",
+    message: [
+      "Smart India Hackathon creates a practical space for ideas to become useful solutions.",
+      "It brings disciplines together, encourages responsible experimentation, and helps students learn from every challenge.",
+      "Use this opportunity to listen carefully, build thoughtfully, and contribute work that serves people well.",
+    ],
   },
   {
     role: "SIH SPOC",
-    name: "Prof. Aishwini Shinde",
-    photo: photo("prof-aishwini-shinde"),
+    name: "Dr. Aishwini Shinde",
+    photo: photo("Dr-aishwini-shinde"),
     designation: "Professor",
     department: "ENTC Engineering",
     description: "Serving as the official Single Point of Contact for Smart India Hackathon.",
     quote: "Every successful innovation starts with guidance, collaboration and persistence. Our role is to empower students to think boldly, build confidently and represent NMIET with excellence.",
+    message: [
+      "Smart India Hackathon is a shared effort built on preparation, communication, and trust.",
+      "It gives students the support to turn promising ideas into well-considered solutions with their peers and mentors.",
+      "Stay engaged, ask for guidance, and represent NMIET with care and confidence.",
+    ],
   },
 ];
 

@@ -16,6 +16,7 @@ from fastapi.responses import StreamingResponse
 from io import BytesIO, StringIO
 import csv
 from openpyxl import Workbook
+from openpyxl.styles import Alignment, Font, PatternFill
 from pydantic import BaseModel, EmailStr, Field
 
 from app.config import ADMIN_BOOTSTRAP_EMAIL, ADMIN_BOOTSTRAP_PASSWORD_HASH, ADMIN_JWT_SECRET
@@ -118,6 +119,25 @@ async def csrf_guard(request: Request):
 async def audit(user: dict, action: str, registration_id: Optional[str] = None, detail: Optional[str] = None):
     await audit_collection.insert_one({"admin_id": user["_id"], "admin_name": user.get("name", user["email"]), "action": action, "registration_id": registration_id, "detail": detail, "timestamp": datetime.now(timezone.utc)})
 
+def registration_query(search: Optional[str] = None, status: Optional[str] = None, theme: Optional[str] = None, category: Optional[str] = None, date_from: Optional[datetime] = None, date_to: Optional[datetime] = None, include_deleted: bool = False):
+    query = {} if include_deleted else {"isDeleted": {"$ne": True}}
+    if status:
+        query["status"] = status
+    if theme:
+        query["team.theme"] = theme
+    if category:
+        query["team.category"] = category
+    if date_from or date_to:
+        query["created_at"] = {**({"$gte": date_from} if date_from else {}), **({"$lte": date_to} if date_to else {})}
+    if search:
+        query["$or"] = [
+            {"team.teamName": {"$regex": search, "$options": "i"}},
+            {"leader.name": {"$regex": search, "$options": "i"}},
+            {"leader.email": {"$regex": search, "$options": "i"}},
+            {"team.psId": {"$regex": search, "$options": "i"}},
+        ]
+    return query
+
 def safe_user(user: dict):
     return {"_id": str(user["_id"]), "name": user.get("name"), "email": user["email"], "role": user["role"], "is_active": user.get("is_active", True), "created_at": user.get("created_at")}
 
@@ -173,17 +193,38 @@ async def bulk_registrations(payload: BulkRegistrationPayload, user=Depends(requ
     return {"success":True,"count":len(ids)}
 
 @router.get("/registrations/export")
-async def export_registrations(format: Literal["csv","xlsx"]="csv", user=Depends(require("export"))):
+async def export_registrations(format: Literal["csv","xlsx"]="csv", search: Optional[str] = None, status: Optional[str] = None, theme: Optional[str] = None, category: Optional[str] = None, date_from: Optional[datetime] = None, date_to: Optional[datetime] = None, include_deleted: bool = False, sort_by: str = "created_at", sort_order: int = -1, user=Depends(require("export"))):
+    header=["Registration Date","Team Name","PS ID","Theme","Category","Status","Leader Name","Leader Email","Leader Phone","Faculty Mentor","College","Department","Year","Team Members","Remarks"]
     rows=[]
-    async for r in registration_collection.find({"isDeleted":{"$ne":True}}):
-        members=r.get("members",[]); rows.append([r.get("created_at",""),r.get("status","Registered"),r.get("team",{}).get("teamName",""),r.get("team",{}).get("psId",""),r.get("team",{}).get("theme",""),r.get("team",{}).get("category",""),r.get("leader",{}).get("name",""),r.get("leader",{}).get("email",""),r.get("leader",{}).get("mobile",""),r.get("mentor",{}).get("name","") if r.get("mentor") else "",r.get("leader",{}).get("department",""),r.get("leader",{}).get("department",""),r.get("leader",{}).get("year",""),*[m.get("name","") for m in members[:5]],r.get("remarks","")])
-    header=["Registration Date","Status","Team Name","PS ID","Theme","Category","Leader Name","Leader Email","Leader Phone","Faculty","Institute","Department","Year","Member 1","Member 2","Member 3","Member 4","Member 5","Remarks"]
-    while rows and len(rows[0])<len(header): rows[0].append("")
+    safe_sort = sort_by if sort_by in {"created_at", "status", "team.teamName", "team.theme"} else "created_at"
+    async for r in registration_collection.find(registration_query(search, status, theme, category, date_from, date_to, include_deleted)).sort(safe_sort, 1 if sort_order == 1 else -1):
+        team = r.get("team", {})
+        leader = r.get("leader", {})
+        mentor = r.get("mentor") or {}
+        members = r.get("members", [])
+        team_members = "; ".join(
+            " — ".join(filter(None, [member.get("name"), member.get("email"), member.get("mobile"), member.get("department"), member.get("year")]))
+            for member in members
+        )
+        rows.append([
+            r.get("created_at").astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M UTC") if isinstance(r.get("created_at"), datetime) else r.get("created_at", ""), team.get("teamName", ""), team.get("psId", ""), team.get("theme", ""), team.get("category", ""), r.get("status", "Registered"),
+            leader.get("name", ""), leader.get("email", ""), leader.get("mobile", ""), mentor.get("name", ""), leader.get("college") or leader.get("institute", ""), leader.get("department", ""), leader.get("year", ""), team_members, r.get("remarks", ""),
+        ])
     filename=f"registrations-{datetime.now().date()}.{format}"
     await audit(user,f"Exported {format.upper()}",detail=filename)
     if format=="csv":
-        stream=StringIO(); writer=csv.writer(stream); writer.writerow(header); writer.writerows([row+['']*(len(header)-len(row)) for row in rows]); return Response(stream.getvalue(),media_type="text/csv",headers={"Content-Disposition":f'attachment; filename="{filename}"'})
-    wb=Workbook(); ws=wb.active; ws.append(header); [ws.append(row+['']*(len(header)-len(row))) for row in rows]; out=BytesIO(); wb.save(out); return StreamingResponse(BytesIO(out.getvalue()),media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",headers={"Content-Disposition":f'attachment; filename="{filename}"'})
+        stream=StringIO(); writer=csv.writer(stream); writer.writerow(header); writer.writerows(rows); return Response(stream.getvalue(),media_type="text/csv",headers={"Content-Disposition":f'attachment; filename="{filename}"'})
+    wb=Workbook(); ws=wb.active; ws.title="Registrations"; ws.freeze_panes="A2"; ws.append(header)
+    for cell in ws[1]:
+        cell.font = Font(bold=True)
+        cell.fill = PatternFill("solid", fgColor="E5E7EB")
+        cell.alignment = Alignment(horizontal="center")
+    for row in rows:
+        ws.append(row)
+    for column in ws.columns:
+        letter = column[0].column_letter
+        ws.column_dimensions[letter].width = min(max(len(str(cell.value or "")) for cell in column) + 2, 60)
+    out=BytesIO(); wb.save(out); out.seek(0); return StreamingResponse(out,media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",headers={"Content-Disposition":f'attachment; filename="{filename}"'})
 
 @router.post("/auth/login", dependencies=[Depends(csrf_guard)])
 async def login(data: LoginPayload, response: Response):
@@ -225,21 +266,19 @@ async def dashboard(user=Depends(current_admin)):
 
 @router.get("/registrations")
 async def registrations(search: Optional[str] = None, status: Optional[str] = None, theme: Optional[str] = None, category: Optional[str] = None, date_from: Optional[datetime] = None, date_to: Optional[datetime] = None, include_deleted: bool = False, sort_by: str = "created_at", sort_order: int = -1, user=Depends(current_admin)):
-    query = {} if include_deleted else {"isDeleted": {"$ne": True}}
-    if status: query["status"] = status
-    if theme: query["team.theme"] = theme
-    if category: query["team.category"] = category
-    if date_from or date_to:
-        query["created_at"] = {**({"$gte": date_from} if date_from else {}), **({"$lte": date_to} if date_to else {})}
-    if search: query["$or"] = [{"team.teamName": {"$regex": search, "$options": "i"}}, {"leader.name": {"$regex": search, "$options": "i"}}, {"leader.email": {"$regex": search, "$options": "i"}}, {"team.psId": {"$regex": search, "$options": "i"}}]
+    query = registration_query(search, status, theme, category, date_from, date_to, include_deleted)
     safe_sort = sort_by if sort_by in {"created_at", "status", "team.teamName", "team.theme"} else "created_at"
     result = []
     async for item in registration_collection.find(query).sort(safe_sort, 1 if sort_order == 1 else -1): item["_id"] = str(item["_id"]); result.append(item)
     return {"data": result}
 
 @router.get("/registrations/{registration_id}")
-async def registration(registration_id: str, user=Depends(current_admin)):
-    item = await registration_collection.find_one({"_id": ObjectId(registration_id), "isDeleted": {"$ne": True}})
+async def registration(registration_id: str, include_deleted: bool = False, user=Depends(current_admin)):
+    try:
+        object_id = ObjectId(registration_id)
+    except Exception:
+        raise HTTPException(400, "Invalid registration ID.")
+    item = await registration_collection.find_one({"_id": object_id, **({} if include_deleted else {"isDeleted": {"$ne": True}})})
     if not item: raise HTTPException(404, "Registration not found.")
     item["_id"] = str(item["_id"]); return item
 

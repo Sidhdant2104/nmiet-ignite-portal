@@ -7,10 +7,43 @@ import { cn } from "@/lib/utils";
 
 const ease = [0.22, 1, 0.36, 1] as const;
 
+type LeadershipMessageCardProps = {
+  image: string;
+  role: string;
+  name: string;
+  designation: string;
+  message: string[];
+};
+
+function LeadershipMessageCard({
+  role,
+  name,
+  designation,
+  message,
+}: LeadershipMessageCardProps) {
+  return (
+    <article className="rounded-2xl border border-l-4 border-border/60 border-l-primary bg-card p-8 shadow-soft sm:p-10">
+      <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">
+        {role} <span aria-hidden="true">•</span> {designation}
+      </p>
+      <h2 className="mt-4 font-display text-2xl font-semibold sm:text-3xl max-md:text-xl">{name}</h2>
+      <div className="mt-6 border-t border-border/60 pt-6">
+        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">Message</p>
+        <div className="mt-5 max-w-xl space-y-4 text-base leading-7 text-muted-foreground sm:text-lg">
+          {message.map((paragraph) => (
+            <p key={paragraph}>{paragraph}</p>
+          ))}
+        </div>
+      </div>
+    </article>
+  );
+}
+
 function FacultyStory({ member, imageRight }: { member: FacultyMember; imageRight: boolean }) {
   const ref = useRef<HTMLElement>(null);
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "end start"] });
   const y = useTransform(scrollYProgress, [0, 1], [40, -40]);
+  const message = member.message ?? [member.quote];
 
   return (
     <section
@@ -52,23 +85,13 @@ function FacultyStory({ member, imageRight }: { member: FacultyMember; imageRigh
           viewport={{ once: true, margin: "-80px" }}
           transition={{ duration: 0.85, delay: 0.1, ease }}
         >
-          <blockquote className="font-display text-2xl font-medium leading-snug tracking-tight sm:text-3xl lg:text-[2rem] lg:leading-snug max-md:text-xl">
-            &ldquo;{member.quote}&rdquo;
-          </blockquote>
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-primary">
-            {member.role}
-          </p>
-          <h2 className="mt-4 font-display text-4xl font-semibold tracking-tight sm:text-5xl lg:text-[3.25rem] max-md:text-3xl">
-            {member.name}
-          </h2>
-          {member.department ? (
-            <p className="mt-4 text-base text-muted-foreground sm:text-lg">{member.department}</p>
-          ) : null}
-          {member.description ? (
-            <p className="mt-8 text-lg leading-relaxed text-muted-foreground sm:text-xl max-md:mt-5 max-md:text-base max-md:leading-7">
-              {member.description}
-            </p>
-          ) : null}
+          <LeadershipMessageCard
+            image={member.photo}
+            role={member.role}
+            name={member.name}
+            designation="NMIET"
+            message={message}
+          />
         </motion.div>
       </div>
     </section>
