@@ -19,17 +19,18 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from pydantic import BaseModel, EmailStr, Field
 
-from app.config import ADMIN_BOOTSTRAP_EMAIL, ADMIN_BOOTSTRAP_PASSWORD_HASH, ADMIN_JWT_SECRET
+from app.config import ADMIN_BOOTSTRAP_EMAIL, ADMIN_BOOTSTRAP_PASSWORD_HASH, ADMIN_JWT_SECRET, PORTAL_URL
 from app.mongodb import admin_users_collection, announcement_collection, audit_collection, registration_collection
+from app.routes.ppt import STATUS as PPT_STATUSES, log_email
 
 router = APIRouter(prefix="/admin", tags=["Administration"])
 Role = Literal["super_admin", "faculty", "student_spoc", "student_coordinator"]
 COOKIE_NAME = "nmiet_admin_session"
 
 ROLE_PERMISSIONS = {
-    "super_admin": {"manage_registrations", "delete_registrations", "manage_announcements", "send_email", "manage_users", "export", "view_dashboard", "view_activity"},
-    "faculty": {"manage_registrations", "export", "view_dashboard"},
-    "student_spoc": {"manage_registrations", "view_dashboard", "export"},
+    "super_admin": {"manage_registrations", "delete_registrations", "manage_announcements", "send_email", "manage_users", "export", "view_dashboard", "view_activity", "review_ppt"},
+    "faculty": {"manage_registrations", "export", "view_dashboard", "review_ppt"},
+    "student_spoc": {"manage_registrations", "view_dashboard", "export", "review_ppt"},
     "student_coordinator": {"view_dashboard"},
 }
 
@@ -69,6 +70,11 @@ class InvitePayload(BaseModel):
     name: str = Field(min_length=2, max_length=80)
     email: EmailStr
     role: Role
+
+class PptReviewPayload(BaseModel):
+    status: Literal["PPT Submitted", "Under Review", "Revision Requested", "Approved", "Rejected", "Qualified"]
+    reviewer_remarks: str = Field(default="", max_length=3000)
+    internal_notes: str = Field(default="", max_length=3000)
 
 def _secret() -> str:
     if not ADMIN_JWT_SECRET or len(ADMIN_JWT_SECRET) < 32:
@@ -118,6 +124,15 @@ async def csrf_guard(request: Request):
 
 async def audit(user: dict, action: str, registration_id: Optional[str] = None, detail: Optional[str] = None):
     await audit_collection.insert_one({"admin_id": user["_id"], "admin_name": user.get("name", user["email"]), "action": action, "registration_id": registration_id, "detail": detail, "timestamp": datetime.now(timezone.utc)})
+
+def ppt_scope(user: dict):
+    if user["role"] == "super_admin": return {"isDeleted": {"$ne": True}}
+    # Faculty and coordinators are restricted to explicitly assigned teams.
+    if user["role"] == "faculty": return {"isDeleted": {"$ne": True}, "mentor.email": user["email"]}
+    return {"isDeleted": {"$ne": True}, "$or": [{"coordinator_email": user["email"]}, {"team.coordinator_email": user["email"]}]}
+
+def serialize(item: dict):
+    item["_id"] = str(item["_id"]); return item
 
 def registration_query(search: Optional[str] = None, status: Optional[str] = None, theme: Optional[str] = None, category: Optional[str] = None, date_from: Optional[datetime] = None, date_to: Optional[datetime] = None, include_deleted: bool = False):
     query = {} if include_deleted else {"isDeleted": {"$ne": True}}
@@ -315,7 +330,47 @@ async def dashboard(user=Depends(current_admin)):
     activity = []
     async for item in audit_collection.find().sort("timestamp", -1).limit(6):
         item["_id"] = str(item["_id"]); activity.append(item)
-    return {"metrics": {"total": total, "software": await count({"team.category": "Software"}), "hardware": await count({"team.category": "Hardware"}), "ppt_submitted": await count({"status": "PPT Submitted"}), "pending_ppt": await count({"status": "Registered"}), "shortlisted": await count({"status": "Shortlisted"}), "rejected": await count({"status": "Rejected"}), "qualified": await count({"status": "Qualified"})}, "status_distribution": status_distribution, "theme_distribution": theme_distribution, "latest": latest, "activity": activity}
+    return {"metrics": {"total": total, "software": await count({"team.category": "Software"}), "hardware": await count({"team.category": "Hardware"}), "ppt_submitted": await count({"ppt.current": {"$exists": True}}), "awaiting_ppt": await count({"ppt.current": {"$exists": False}}), "under_review": await count({"ppt.current.status": "Under Review"}), "approved": await count({"ppt.current.status": "Approved"}), "revision_requested": await count({"ppt.current.status": "Revision Requested"}), "pending_ppt": await count({"status": "Registered"}), "shortlisted": await count({"status": "Shortlisted"}), "rejected": await count({"status": "Rejected"}), "qualified": await count({"status": "Qualified"})}, "status_distribution": status_distribution, "theme_distribution": theme_distribution, "latest": latest, "activity": activity}
+
+@router.get("/ppt/submissions")
+async def ppt_submissions(user=Depends(require("review_ppt"))):
+    results = []
+    async for item in registration_collection.find(ppt_scope(user)).sort("ppt.current.uploaded_at", -1):
+        item["_id"] = str(item["_id"]); results.append(item)
+    return {"data": results}
+
+@router.get("/ppt/submissions/{registration_id}")
+async def ppt_submission(registration_id: str, user=Depends(require("review_ppt"))):
+    try: object_id = ObjectId(registration_id)
+    except Exception: raise HTTPException(400, "Invalid registration ID.")
+    item = await registration_collection.find_one({"_id": object_id, **ppt_scope(user)})
+    if not item: raise HTTPException(404, "Submission not found or not permitted.")
+    return serialize(item)
+
+@router.post("/ppt/submissions/{registration_id}/download/{version}")
+async def ppt_download_url(registration_id: str, version: int, request: Request, user=Depends(require("review_ppt"))):
+    try: object_id = ObjectId(registration_id)
+    except Exception: raise HTTPException(400, "Invalid registration ID.")
+    item = await registration_collection.find_one({"_id": object_id, **ppt_scope(user)})
+    if not item or not any(x.get("version") == version for x in item.get("ppt", {}).get("history", [])): raise HTTPException(404, "Upload not found.")
+    token = jwt.encode({"purpose": "ppt_download", "registration_id": registration_id, "version": version, "exp": datetime.now(timezone.utc) + timedelta(minutes=10)}, _secret(), algorithm="HS256")
+    return {"url": f"{str(request.base_url).rstrip('/')}/ppt/download/{registration_id}/{version}?token={token}", "expires_in_seconds": 600}
+
+@router.patch("/ppt/submissions/{registration_id}", dependencies=[Depends(csrf_guard)])
+async def review_ppt(registration_id: str, payload: PptReviewPayload, user=Depends(require("review_ppt"))):
+    try: object_id = ObjectId(registration_id)
+    except Exception: raise HTTPException(400, "Invalid registration ID.")
+    item = await registration_collection.find_one({"_id": object_id, **ppt_scope(user)})
+    if not item or not item.get("ppt", {}).get("current"): raise HTTPException(404, "PPT submission not found.")
+    now = datetime.now(timezone.utc); current = item["ppt"]["current"]
+    current.update({"status": payload.status, "reviewer_remarks": payload.reviewer_remarks, "internal_notes": payload.internal_notes, "last_modified": now, "reviewed_by": user["email"]})
+    history = item["ppt"].get("history", []);
+    if history: history[-1].update({"status": payload.status, "reviewer_remarks": payload.reviewer_remarks})
+    await registration_collection.update_one({"_id": object_id}, {"$set": {"ppt.current": current, "ppt.history": history, "status": payload.status, "updated_at": now}})
+    await audit(user, "Reviewed PPT", registration_id, f"{payload.status}: {payload.reviewer_remarks[:180]}")
+    leader = item.get("leader", {}); team = item.get("team", {})
+    await log_email(leader.get("email", ""), f"PPT review update: {payload.status}", f"Hello {leader.get('name', 'Team Leader')},\n\nYour PPT submission for {team.get('teamName', 'your team')} is now: {payload.status}.\nReference ID: {item.get('registration_id')}\n\nReviewer remarks:\n{payload.reviewer_remarks or 'No remarks provided.'}\n\n{PORTAL_URL}/ppt-submission")
+    return {"success": True}
 
 @router.get("/registrations")
 async def registrations(search: Optional[str] = None, status: Optional[str] = None, theme: Optional[str] = None, category: Optional[str] = None, date_from: Optional[datetime] = None, date_to: Optional[datetime] = None, include_deleted: bool = False, sort_by: str = "created_at", sort_order: int = -1, user=Depends(current_admin)):

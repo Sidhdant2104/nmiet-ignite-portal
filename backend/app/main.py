@@ -11,6 +11,7 @@ from app.routes.problem import router as problem_router
 
 from app.routes.theme import router as theme_router
 from app.routes.admin import router as admin_router
+from app.routes.ppt import router as ppt_router
 
 @asynccontextmanager
 
@@ -55,6 +56,7 @@ app.include_router(problem_router)
 app.include_router(registration_router)
 app.include_router(theme_router)
 app.include_router(admin_router)
+app.include_router(ppt_router)
 @app.get("/")
 async def root():
 

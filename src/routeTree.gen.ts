@@ -12,9 +12,12 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as GuidelinesRouteImport } from './routes/guidelines'
 import { Route as OrganizingCommitteeRouteImport } from './routes/organizing-committee'
+import { Route as PptSubmissionRouteImport } from './routes/ppt-submission'
+import { Route as PptTemplateRouteImport } from './routes/ppt-template'
 import { Route as PreviousYearsRouteImport } from './routes/previous-years'
 import { Route as ProblemStatementsRouteImport } from './routes/problem-statements'
 import { Route as RegisterRouteImport } from './routes/register'
+import { Route as SubmissionGuidelinesRouteImport } from './routes/submission-guidelines'
 import { Route as ThemesRouteImport } from './routes/themes'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminActivityRouteImport } from './routes/admin/activity'
@@ -29,6 +32,7 @@ import { Route as ApiAnnouncementsRouteImport } from './routes/api/announcements
 import { Route as ApiProblemStatementsRouteImport } from './routes/api/problem-statements'
 import { Route as ApiRegisterRouteImport } from './routes/api/register'
 import { Route as ApiThemesRouteImport } from './routes/api/themes'
+import { Route as AdminPptIdRouteImport } from './routes/admin/ppt/$id'
 import { Route as AdminRegistrationsIdRouteImport } from './routes/admin/registrations/$id'
 
 const IndexRoute = IndexRouteImport.update({
@@ -46,6 +50,16 @@ const OrganizingCommitteeRoute = OrganizingCommitteeRouteImport.update({
   path: '/organizing-committee',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PptSubmissionRoute = PptSubmissionRouteImport.update({
+  id: '/ppt-submission',
+  path: '/ppt-submission',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PptTemplateRoute = PptTemplateRouteImport.update({
+  id: '/ppt-template',
+  path: '/ppt-template',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PreviousYearsRoute = PreviousYearsRouteImport.update({
   id: '/previous-years',
   path: '/previous-years',
@@ -59,6 +73,11 @@ const ProblemStatementsRoute = ProblemStatementsRouteImport.update({
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
   path: '/register',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SubmissionGuidelinesRoute = SubmissionGuidelinesRouteImport.update({
+  id: '/submission-guidelines',
+  path: '/submission-guidelines',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ThemesRoute = ThemesRouteImport.update({
@@ -131,6 +150,11 @@ const ApiThemesRoute = ApiThemesRouteImport.update({
   path: '/api/themes',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminPptIdRoute = AdminPptIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => AdminPptRoute,
+} as any)
 const AdminRegistrationsIdRoute = AdminRegistrationsIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -141,16 +165,19 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/guidelines': typeof GuidelinesRoute
   '/organizing-committee': typeof OrganizingCommitteeRoute
+  '/ppt-submission': typeof PptSubmissionRoute
+  '/ppt-template': typeof PptTemplateRoute
   '/previous-years': typeof PreviousYearsRoute
   '/problem-statements': typeof ProblemStatementsRoute
   '/register': typeof RegisterRoute
+  '/submission-guidelines': typeof SubmissionGuidelinesRoute
   '/themes': typeof ThemesRoute
   '/admin/activity': typeof AdminActivityRoute
   '/admin/announcements': typeof AdminAnnouncementsRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/email': typeof AdminEmailRoute
   '/admin/login': typeof AdminLoginRoute
-  '/admin/ppt': typeof AdminPptRoute
+  '/admin/ppt': typeof AdminPptRouteWithChildren
   '/admin/registrations': typeof AdminRegistrationsRouteWithChildren
   '/admin/users': typeof AdminUsersRoute
   '/api/announcements': typeof ApiAnnouncementsRoute
@@ -158,22 +185,26 @@ export interface FileRoutesByFullPath {
   '/api/register': typeof ApiRegisterRoute
   '/api/themes': typeof ApiThemesRoute
   '/admin/': typeof AdminIndexRoute
+  '/admin/ppt/$id': typeof AdminPptIdRoute
   '/admin/registrations/$id': typeof AdminRegistrationsIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/guidelines': typeof GuidelinesRoute
   '/organizing-committee': typeof OrganizingCommitteeRoute
+  '/ppt-submission': typeof PptSubmissionRoute
+  '/ppt-template': typeof PptTemplateRoute
   '/previous-years': typeof PreviousYearsRoute
   '/problem-statements': typeof ProblemStatementsRoute
   '/register': typeof RegisterRoute
+  '/submission-guidelines': typeof SubmissionGuidelinesRoute
   '/themes': typeof ThemesRoute
   '/admin/activity': typeof AdminActivityRoute
   '/admin/announcements': typeof AdminAnnouncementsRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/email': typeof AdminEmailRoute
   '/admin/login': typeof AdminLoginRoute
-  '/admin/ppt': typeof AdminPptRoute
+  '/admin/ppt': typeof AdminPptRouteWithChildren
   '/admin/registrations': typeof AdminRegistrationsRouteWithChildren
   '/admin/users': typeof AdminUsersRoute
   '/api/announcements': typeof ApiAnnouncementsRoute
@@ -181,6 +212,7 @@ export interface FileRoutesByTo {
   '/api/register': typeof ApiRegisterRoute
   '/api/themes': typeof ApiThemesRoute
   '/admin': typeof AdminIndexRoute
+  '/admin/ppt/$id': typeof AdminPptIdRoute
   '/admin/registrations/$id': typeof AdminRegistrationsIdRoute
 }
 export interface FileRoutesById {
@@ -188,16 +220,19 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/guidelines': typeof GuidelinesRoute
   '/organizing-committee': typeof OrganizingCommitteeRoute
+  '/ppt-submission': typeof PptSubmissionRoute
+  '/ppt-template': typeof PptTemplateRoute
   '/previous-years': typeof PreviousYearsRoute
   '/problem-statements': typeof ProblemStatementsRoute
   '/register': typeof RegisterRoute
+  '/submission-guidelines': typeof SubmissionGuidelinesRoute
   '/themes': typeof ThemesRoute
   '/admin/activity': typeof AdminActivityRoute
   '/admin/announcements': typeof AdminAnnouncementsRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/email': typeof AdminEmailRoute
   '/admin/login': typeof AdminLoginRoute
-  '/admin/ppt': typeof AdminPptRoute
+  '/admin/ppt': typeof AdminPptRouteWithChildren
   '/admin/registrations': typeof AdminRegistrationsRouteWithChildren
   '/admin/users': typeof AdminUsersRoute
   '/api/announcements': typeof ApiAnnouncementsRoute
@@ -205,6 +240,7 @@ export interface FileRoutesById {
   '/api/register': typeof ApiRegisterRoute
   '/api/themes': typeof ApiThemesRoute
   '/admin/': typeof AdminIndexRoute
+  '/admin/ppt/$id': typeof AdminPptIdRoute
   '/admin/registrations/$id': typeof AdminRegistrationsIdRoute
 }
 export interface FileRouteTypes {
@@ -213,9 +249,12 @@ export interface FileRouteTypes {
     | '/'
     | '/guidelines'
     | '/organizing-committee'
+    | '/ppt-submission'
+    | '/ppt-template'
     | '/previous-years'
     | '/problem-statements'
     | '/register'
+    | '/submission-guidelines'
     | '/themes'
     | '/admin/activity'
     | '/admin/announcements'
@@ -230,15 +269,19 @@ export interface FileRouteTypes {
     | '/api/register'
     | '/api/themes'
     | '/admin/'
+    | '/admin/ppt/$id'
     | '/admin/registrations/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/guidelines'
     | '/organizing-committee'
+    | '/ppt-submission'
+    | '/ppt-template'
     | '/previous-years'
     | '/problem-statements'
     | '/register'
+    | '/submission-guidelines'
     | '/themes'
     | '/admin/activity'
     | '/admin/announcements'
@@ -253,15 +296,19 @@ export interface FileRouteTypes {
     | '/api/register'
     | '/api/themes'
     | '/admin'
+    | '/admin/ppt/$id'
     | '/admin/registrations/$id'
   id:
     | '__root__'
     | '/'
     | '/guidelines'
     | '/organizing-committee'
+    | '/ppt-submission'
+    | '/ppt-template'
     | '/previous-years'
     | '/problem-statements'
     | '/register'
+    | '/submission-guidelines'
     | '/themes'
     | '/admin/activity'
     | '/admin/announcements'
@@ -276,6 +323,7 @@ export interface FileRouteTypes {
     | '/api/register'
     | '/api/themes'
     | '/admin/'
+    | '/admin/ppt/$id'
     | '/admin/registrations/$id'
   fileRoutesById: FileRoutesById
 }
@@ -283,16 +331,19 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   GuidelinesRoute: typeof GuidelinesRoute
   OrganizingCommitteeRoute: typeof OrganizingCommitteeRoute
+  PptSubmissionRoute: typeof PptSubmissionRoute
+  PptTemplateRoute: typeof PptTemplateRoute
   PreviousYearsRoute: typeof PreviousYearsRoute
   ProblemStatementsRoute: typeof ProblemStatementsRoute
   RegisterRoute: typeof RegisterRoute
+  SubmissionGuidelinesRoute: typeof SubmissionGuidelinesRoute
   ThemesRoute: typeof ThemesRoute
   AdminActivityRoute: typeof AdminActivityRoute
   AdminAnnouncementsRoute: typeof AdminAnnouncementsRoute
   AdminDashboardRoute: typeof AdminDashboardRoute
   AdminEmailRoute: typeof AdminEmailRoute
   AdminLoginRoute: typeof AdminLoginRoute
-  AdminPptRoute: typeof AdminPptRoute
+  AdminPptRoute: typeof AdminPptRouteWithChildren
   AdminRegistrationsRoute: typeof AdminRegistrationsRouteWithChildren
   AdminUsersRoute: typeof AdminUsersRoute
   ApiAnnouncementsRoute: typeof ApiAnnouncementsRoute
@@ -325,6 +376,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OrganizingCommitteeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/ppt-submission': {
+      id: '/ppt-submission'
+      path: '/ppt-submission'
+      fullPath: '/ppt-submission'
+      preLoaderRoute: typeof PptSubmissionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ppt-template': {
+      id: '/ppt-template'
+      path: '/ppt-template'
+      fullPath: '/ppt-template'
+      preLoaderRoute: typeof PptTemplateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/previous-years': {
       id: '/previous-years'
       path: '/previous-years'
@@ -344,6 +409,13 @@ declare module '@tanstack/react-router' {
       path: '/register'
       fullPath: '/register'
       preLoaderRoute: typeof RegisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/submission-guidelines': {
+      id: '/submission-guidelines'
+      path: '/submission-guidelines'
+      fullPath: '/submission-guidelines'
+      preLoaderRoute: typeof SubmissionGuidelinesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/themes': {
@@ -444,6 +516,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiThemesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/ppt/$id': {
+      id: '/admin/ppt/$id'
+      path: '/$id'
+      fullPath: '/admin/ppt/$id'
+      preLoaderRoute: typeof AdminPptIdRouteImport
+      parentRoute: typeof AdminPptRoute
+    }
     '/admin/registrations/$id': {
       id: '/admin/registrations/$id'
       path: '/$id'
@@ -453,6 +532,18 @@ declare module '@tanstack/react-router' {
     }
   }
 }
+
+interface AdminPptRouteChildren {
+  AdminPptIdRoute: typeof AdminPptIdRoute
+}
+
+const AdminPptRouteChildren: AdminPptRouteChildren = {
+  AdminPptIdRoute: AdminPptIdRoute,
+}
+
+const AdminPptRouteWithChildren = AdminPptRoute._addFileChildren(
+  AdminPptRouteChildren,
+)
 
 interface AdminRegistrationsRouteChildren {
   AdminRegistrationsIdRoute: typeof AdminRegistrationsIdRoute
@@ -469,16 +560,19 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   GuidelinesRoute: GuidelinesRoute,
   OrganizingCommitteeRoute: OrganizingCommitteeRoute,
+  PptSubmissionRoute: PptSubmissionRoute,
+  PptTemplateRoute: PptTemplateRoute,
   PreviousYearsRoute: PreviousYearsRoute,
   ProblemStatementsRoute: ProblemStatementsRoute,
   RegisterRoute: RegisterRoute,
+  SubmissionGuidelinesRoute: SubmissionGuidelinesRoute,
   ThemesRoute: ThemesRoute,
   AdminActivityRoute: AdminActivityRoute,
   AdminAnnouncementsRoute: AdminAnnouncementsRoute,
   AdminDashboardRoute: AdminDashboardRoute,
   AdminEmailRoute: AdminEmailRoute,
   AdminLoginRoute: AdminLoginRoute,
-  AdminPptRoute: AdminPptRoute,
+  AdminPptRoute: AdminPptRouteWithChildren,
   AdminRegistrationsRoute: AdminRegistrationsRouteWithChildren,
   AdminUsersRoute: AdminUsersRoute,
   ApiAnnouncementsRoute: ApiAnnouncementsRoute,

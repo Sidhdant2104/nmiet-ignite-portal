@@ -17,6 +17,8 @@ const primaryNavItems = [
 const moreNavItems = [
   { label: "Organizing Committee", href: "/organizing-committee" },
   { label: "Guidelines", href: "/guidelines" },
+  { label: "PPT Submission", href: "/ppt-submission" },
+  { label: "PPT Template", href: "/ppt-template" },
   { label: "Timeline", href: "/#selection" },
   { label: "FAQ", href: "/#faq" },
   { label: "Contact", href: "/#contact" },

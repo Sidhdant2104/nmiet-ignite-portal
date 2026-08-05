@@ -5,6 +5,8 @@ from app.mongodb import registration_collection
 from app.validators.registration_validator import registration_validator
 import re
 from datetime import datetime
+from app.routes.ppt import log_email
+from app.config import PORTAL_URL
 import math
 
 class RegistrationService:
@@ -20,6 +22,10 @@ class RegistrationService:
         registration["updated_at"] = datetime.utcnow()
 
         result = await registration_collection.insert_one(registration)
+
+        team, leader = registration.get("team", {}), registration.get("leader", {})
+        created = registration["created_at"]
+        await log_email(leader.get("email", ""), "NMIET SIH registration confirmed", f"Hello {leader.get('name', 'Team Leader')},\n\nYour NMIET SIH registration is confirmed.\n\nTeam name: {team.get('teamName')}\nReference ID: {registration['registration_id']}\nPS ID: {team.get('psId')}\nTheme: {team.get('theme')}\nRegistration date: {created:%d %b %Y}\n\nPPT Template: {PORTAL_URL}/ppt-template\nSubmission Guidelines: {PORTAL_URL}/submission-guidelines\nUpload PPT: {PORTAL_URL}/ppt-submission")
 
         return {
             "id": str(result.inserted_id),
