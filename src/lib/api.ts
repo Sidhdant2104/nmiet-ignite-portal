@@ -81,6 +81,13 @@ export const announcementsQuery = queryOptions({
   staleTime: 5 * 60 * 1000,
 });
 
+export const registrationStatusQuery = queryOptions({
+  queryKey: ["registration-status"],
+  queryFn: () => getJson<{ is_open: boolean }>("/registrations/status"),
+  staleTime: 30 * 1000,
+  refetchInterval: 30 * 1000,
+});
+
 
 export type RegistrationPayload = Record<string, unknown>;
 

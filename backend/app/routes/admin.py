@@ -6,23 +6,24 @@ environment configuration or written to the database.
 """
 from datetime import datetime, timedelta, timezone
 from typing import Literal, Optional
-import os
+import asyncio
 
 import bcrypt
 import jwt
+import cloudinary.utils
+import requests
 from bson import ObjectId
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
-from fastapi.responses import StreamingResponse, FileResponse
+from fastapi.responses import StreamingResponse
 from io import BytesIO, StringIO
 import csv
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from pydantic import BaseModel, EmailStr, Field
 
-from app.config import ADMIN_BOOTSTRAP_EMAIL, ADMIN_BOOTSTRAP_PASSWORD_HASH, ADMIN_JWT_SECRET, PORTAL_URL, PPT_STORAGE_DIR
-from pathlib import Path
+from app.config import ADMIN_BOOTSTRAP_EMAIL, ADMIN_BOOTSTRAP_PASSWORD_HASH, ADMIN_JWT_SECRET, PORTAL_URL
 from copy import deepcopy
-from app.mongodb import admin_users_collection, announcement_collection, audit_collection, registration_collection
+from app.mongodb import admin_users_collection, announcement_collection, audit_collection, registration_collection, settings_collection
 from app.routes.ppt import STATUS as PPT_STATUSES, log_email
 
 router = APIRouter(prefix="/admin", tags=["Administration"])
@@ -30,10 +31,10 @@ Role = Literal["super_admin", "faculty", "student_spoc", "student_coordinator"]
 COOKIE_NAME = "nmiet_admin_session"
 
 ROLE_PERMISSIONS = {
-    "super_admin": {"manage_registrations", "delete_registrations", "manage_announcements", "send_email", "manage_users", "export", "view_dashboard", "view_activity", "review_ppt"},
-    "faculty": {"manage_registrations", "export", "view_dashboard", "review_ppt"},
-    "student_spoc": {"manage_registrations", "view_dashboard", "export", "review_ppt"},
-    "student_coordinator": {"view_dashboard"},
+    "super_admin": {"manage_registrations", "delete_registrations", "manage_announcements", "send_email", "manage_users", "export", "view_dashboard", "view_activity", "view_ppt", "review_ppt", "download_ppt"},
+    "faculty": {"manage_registrations", "export", "view_dashboard", "view_ppt", "review_ppt", "download_ppt"},
+    "student_spoc": {"manage_registrations", "view_dashboard", "export", "view_ppt"},
+    "student_coordinator": {"view_dashboard", "view_ppt"},
 }
 
 class LoginPayload(BaseModel):
@@ -77,6 +78,9 @@ class PptReviewPayload(BaseModel):
     status: Literal["PPT Submitted", "Under Review", "Revision Requested", "Approved", "Rejected", "Qualified"]
     reviewer_remarks: str = Field(default="", max_length=3000)
     internal_notes: str = Field(default="", max_length=3000)
+
+class RegistrationControlPayload(BaseModel):
+    is_open: bool
 
 def _secret() -> str:
     if not ADMIN_JWT_SECRET or len(ADMIN_JWT_SECRET) < 32:
@@ -138,7 +142,9 @@ def serialize(item: dict):
     for upload in safe.get("ppt", {}).get("history", []):
         upload.pop("storage_key", None); upload.pop("storage_path", None)
     current = safe.get("ppt", {}).get("current")
-    if current: current.pop("storage_key", None); current.pop("storage_path", None)
+    if current:
+        current.pop("storage_key", None); current.pop("storage_path", None)
+        current.pop("cloudinary_public_id", None); current.pop("secure_url", None)
     return safe
 
 def registration_query(search: Optional[str] = None, status: Optional[str] = None, theme: Optional[str] = None, category: Optional[str] = None, date_from: Optional[datetime] = None, date_to: Optional[datetime] = None, include_deleted: bool = False):
@@ -337,60 +343,64 @@ async def dashboard(user=Depends(current_admin)):
     activity = []
     async for item in audit_collection.find().sort("timestamp", -1).limit(6):
         item["_id"] = str(item["_id"]); activity.append(item)
-    return {"metrics": {"total": total, "software": await count({"team.category": "Software"}), "hardware": await count({"team.category": "Hardware"}), "ppt_submitted": await count({"ppt.current": {"$exists": True}}), "awaiting_ppt": await count({"ppt.current": {"$exists": False}}), "under_review": await count({"ppt.current.status": "Under Review"}), "approved": await count({"ppt.current.status": "Approved"}), "revision_requested": await count({"ppt.current.status": "Revision Requested"}), "pending_ppt": await count({"status": "Registered"}), "shortlisted": await count({"status": "Shortlisted"}), "rejected": await count({"status": "Rejected"}), "qualified": await count({"status": "Qualified"})}, "status_distribution": status_distribution, "theme_distribution": theme_distribution, "latest": latest, "activity": activity}
+    control = await settings_collection.find_one({"key": "registration_control"})
+    return {"registration_open": True if not control else control.get("is_open", True), "metrics": {"total": total, "software": await count({"team.category": "Software"}), "hardware": await count({"team.category": "Hardware"}), "ppt_submitted": await count({"ppt.current": {"$exists": True}}), "awaiting_ppt": await count({"ppt.current": {"$exists": False}}), "under_review": await count({"ppt.current.status": "Under Review"}), "approved": await count({"ppt.current.status": "Approved"}), "revision_requested": await count({"ppt.current.status": "Revision Requested"}), "pending_ppt": await count({"status": "Registered"}), "shortlisted": await count({"status": "Shortlisted"}), "rejected": await count({"status": "Rejected"}), "qualified": await count({"status": "Qualified"})}, "status_distribution": status_distribution, "theme_distribution": theme_distribution, "latest": latest, "activity": activity}
 
+@router.get("/registration-control")
+async def get_registration_control(user=Depends(current_admin)):
+    control = await settings_collection.find_one({"key": "registration_control"})
+    return {"is_open": True if not control else control.get("is_open", True)}
+
+@router.put("/registration-control", dependencies=[Depends(csrf_guard)])
+async def set_registration_control(payload: RegistrationControlPayload, user=Depends(require("manage_users"))):
+    if user["role"] != "super_admin": raise HTTPException(403, "Only Super Admin can change registration availability.")
+    await settings_collection.update_one({"key": "registration_control"}, {"$set": {"is_open": payload.is_open, "updated_at": datetime.now(timezone.utc), "updated_by": user["_id"]}}, upsert=True)
+    await audit(user, "Registrations opened" if payload.is_open else "Registrations closed", detail=f"Registrations {'opened' if payload.is_open else 'closed'} by Super Admin")
+    return {"is_open": payload.is_open}
+
+@router.get("/ppt")
 @router.get("/ppt/submissions")
-async def ppt_submissions(user=Depends(require("review_ppt"))):
+async def ppt_submissions(user=Depends(require("view_ppt"))):
     results = []
-    async for item in registration_collection.find(ppt_scope(user)).sort("ppt.current.uploaded_at", -1):
-        results.append(serialize(item))
+    async for item in registration_collection.find(ppt_scope(user)).sort("ppt.current.uploaded_at", -1): results.append(serialize(item))
     return {"data": results}
-
-@router.get("/ppt/submissions/{registration_id}")
-async def ppt_submission(registration_id: str, user=Depends(require("review_ppt"))):
-    try: object_id = ObjectId(registration_id)
-    except Exception: raise HTTPException(400, "Invalid registration ID.")
-    item = await registration_collection.find_one({"_id": object_id, **ppt_scope(user)})
-    if not item: raise HTTPException(404, "Submission not found or not permitted.")
-    return serialize(item)
 
 async def _ppt_file(registration_id: str, user: dict):
     try: object_id = ObjectId(registration_id)
     except Exception: raise HTTPException(400, "Invalid registration ID.")
     item = await registration_collection.find_one({"_id": object_id, **ppt_scope(user)})
     current = item.get("ppt", {}).get("current") if item else None
-    if not current: raise HTTPException(404, "PPT submission not found or not permitted.")
-    path = Path(PPT_STORAGE_DIR) / current.get("storage_key", current.get("file_name", ""))
-    if not path.is_file(): raise HTTPException(404, "The uploaded file is unavailable.")
-    return item, current, path
+    if not current or not current.get("cloudinary_public_id"): raise HTTPException(404, "PPT submission not found or not permitted.")
+    return item, current
 
+async def _cloudinary_content(current: dict):
+    try:
+        url, _ = cloudinary.utils.cloudinary_url(current["cloudinary_public_id"], resource_type="raw", type="authenticated", secure=True, sign_url=True, expires_at=int((datetime.now(timezone.utc) + timedelta(minutes=5)).timestamp()))
+        response = await asyncio.to_thread(requests.get, url, timeout=30)
+        response.raise_for_status()
+        return response.content
+    except Exception as error: raise HTTPException(502, "Cloudinary could not retrieve the presentation.") from error
+
+@router.get("/ppt/submissions/{registration_id}")
 @router.get("/ppt/{registration_id}")
-async def ppt_submission_compat(registration_id: str, user=Depends(require("review_ppt"))):
-    item, _, _ = await _ppt_file(registration_id, user)
+async def ppt_submission(registration_id: str, user=Depends(require("view_ppt"))):
+    item, _ = await _ppt_file(registration_id, user)
     return serialize(item)
 
 @router.get("/ppt/{registration_id}/download")
-async def ppt_download(registration_id: str, user=Depends(require("review_ppt"))):
-    item, current, path = await _ppt_file(registration_id, user)
-    await audit(user, "Downloaded PPT", registration_id, f"Version {current.get('version')}: {current.get('filename')}")
-    return FileResponse(path, media_type=current.get("content_type", "application/octet-stream"), filename=current.get("filename", "presentation"))
+async def ppt_download(registration_id: str, user=Depends(require("download_ppt"))):
+    _, current = await _ppt_file(registration_id, user)
+    content = await _cloudinary_content(current)
+    await audit(user, "Faculty downloaded PPT", registration_id, f"Version {current.get('version')}: {current.get('file_name')}")
+    return StreamingResponse(BytesIO(content), media_type="application/octet-stream", headers={"Content-Disposition": f'attachment; filename="{current.get("file_name", "presentation")}"'})
 
 @router.get("/ppt/{registration_id}/preview")
-async def ppt_preview(registration_id: str, user=Depends(require("review_ppt"))):
-    item, current, path = await _ppt_file(registration_id, user)
-    if current.get("file_type") != "pdf" and not str(current.get("filename", "")).lower().endswith(".pdf"):
-        raise HTTPException(422, "In-browser preview is available for PDF uploads. Download the original PPT/PPTX instead.")
-    await audit(user, "Previewed PPT", registration_id, f"Version {current.get('version')}: {current.get('filename')}")
-    return FileResponse(path, media_type="application/pdf", headers={"Content-Disposition": f'inline; filename="{current.get("filename", "presentation.pdf")}"'})
-
-@router.post("/ppt/submissions/{registration_id}/download/{version}")
-async def ppt_download_url(registration_id: str, version: int, request: Request, user=Depends(require("review_ppt"))):
-    try: object_id = ObjectId(registration_id)
-    except Exception: raise HTTPException(400, "Invalid registration ID.")
-    item = await registration_collection.find_one({"_id": object_id, **ppt_scope(user)})
-    if not item or not any(x.get("version") == version for x in item.get("ppt", {}).get("history", [])): raise HTTPException(404, "Upload not found.")
-    token = jwt.encode({"purpose": "ppt_download", "registration_id": registration_id, "version": version, "exp": datetime.now(timezone.utc) + timedelta(minutes=10)}, _secret(), algorithm="HS256")
-    return {"url": f"{str(request.base_url).rstrip('/')}/ppt/download/{registration_id}/{version}?token={token}", "expires_in_seconds": 600}
+async def ppt_preview(registration_id: str, user=Depends(require("download_ppt"))):
+    _, current = await _ppt_file(registration_id, user)
+    if current.get("format") != "pdf": raise HTTPException(422, "Preview is available for PDF uploads. Download PPT/PPTX to review it.")
+    content = await _cloudinary_content(current)
+    await audit(user, "Previewed PPT", registration_id, f"Version {current.get('version')}: {current.get('file_name')}")
+    return StreamingResponse(BytesIO(content), media_type="application/pdf", headers={"Content-Disposition": f'inline; filename="{current.get("file_name", "presentation.pdf")}"'})
 
 @router.patch("/ppt/submissions/{registration_id}", dependencies=[Depends(csrf_guard)])
 async def review_ppt(registration_id: str, payload: PptReviewPayload, user=Depends(require("review_ppt"))):
@@ -413,7 +423,7 @@ async def registrations(search: Optional[str] = None, status: Optional[str] = No
     query = registration_query(search, status, theme, category, date_from, date_to, include_deleted)
     safe_sort = sort_by if sort_by in {"created_at", "status", "team.teamName", "team.theme"} else "created_at"
     result = []
-    async for item in registration_collection.find(query).sort(safe_sort, 1 if sort_order == 1 else -1): item["_id"] = str(item["_id"]); result.append(item)
+    async for item in registration_collection.find(query).sort(safe_sort, 1 if sort_order == 1 else -1): result.append(serialize(item))
     return {"data": result}
 
 @router.get("/registrations/{registration_id}")
@@ -424,7 +434,7 @@ async def registration(registration_id: str, include_deleted: bool = False, user
         raise HTTPException(400, "Invalid registration ID.")
     item = await registration_collection.find_one({"_id": object_id, **({} if include_deleted else {"isDeleted": {"$ne": True}})})
     if not item: raise HTTPException(404, "Registration not found.")
-    item["_id"] = str(item["_id"]); return item
+    return serialize(item)
 
 @router.patch("/registrations/{registration_id}", dependencies=[Depends(csrf_guard)])
 async def update_registration(registration_id: str, payload: RegistrationPatch, user=Depends(require("manage_registrations"))):

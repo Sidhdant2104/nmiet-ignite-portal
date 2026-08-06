@@ -1,25 +1,28 @@
 """Private PPT submission endpoints. Files never live under a static/public path."""
 from datetime import datetime, timezone, timedelta
-from pathlib import Path
 from typing import Optional
-import os, shutil, smtplib, uuid
+import smtplib
 from email.message import EmailMessage
+from io import BytesIO
 
 import jwt
+import cloudinary
+import cloudinary.uploader
 from bson import ObjectId
 from fastapi import APIRouter, File, Form, Header, HTTPException, UploadFile
-from fastapi.responses import FileResponse, StreamingResponse
-from io import BytesIO
+from fastapi.responses import StreamingResponse
 from zipfile import ZIP_DEFLATED, ZipFile
 from pydantic import BaseModel, EmailStr
 
-from app.config import ADMIN_JWT_SECRET, PORTAL_URL, PPT_STORAGE_DIR, PPT_SUBMISSION_DEADLINE, SMTP_FROM, SMTP_HOST, SMTP_PASSWORD, SMTP_PORT, SMTP_USERNAME
+from app.config import ADMIN_JWT_SECRET, PORTAL_URL, PPT_SUBMISSION_DEADLINE, SMTP_FROM, SMTP_HOST, SMTP_PASSWORD, SMTP_PORT, SMTP_USERNAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET, CLOUDINARY_CLOUD_NAME, CLOUDINARY_UPLOAD_PRESET
 from app.mongodb import audit_collection, email_collection, registration_collection
 
 router = APIRouter(prefix="/ppt", tags=["PPT submissions"])
 MAX_BYTES = 25 * 1024 * 1024
 ALLOWED = {".ppt", ".pptx", ".pdf"}
 STATUS = {"Awaiting PPT", "PPT Submitted", "Under Review", "Revision Requested", "Approved", "Rejected", "Qualified"}
+
+cloudinary.config(cloud_name=CLOUDINARY_CLOUD_NAME, api_key=CLOUDINARY_API_KEY, api_secret=CLOUDINARY_API_SECRET, secure=True)
 
 class VerifyPayload(BaseModel):
     reference_id: str
@@ -55,6 +58,13 @@ async def log_email(to: str, subject: str, body: str):
 
 def upload_token(item):
     return jwt.encode({"sub": str(item["_id"]), "purpose": "ppt_upload", "exp": datetime.now(timezone.utc) + timedelta(minutes=30)}, secret(), algorithm="HS256")
+
+def cloudinary_ready():
+    if not CLOUDINARY_CLOUD_NAME or not CLOUDINARY_API_KEY or not CLOUDINARY_API_SECRET:
+        raise HTTPException(503, "Cloudinary storage is not configured.")
+
+def cloudinary_public_id(reference_id: str, extension: str):
+    return f"nmiet-sih/ppt/2026/{reference_id}/{reference_id}.{extension}"
 
 async def item_from_upload_token(authorization: Optional[str]):
     token = authorization.removeprefix("Bearer ") if authorization else ""
@@ -95,40 +105,27 @@ async def upload(file: UploadFile = File(...), authorization: Optional[str] = He
     item = await item_from_upload_token(authorization)
     until = deadline()
     if until and datetime.now(timezone.utc) > until: raise HTTPException(403, "The PPT submission deadline has passed.")
-    original = Path(file.filename or "").name
-    ext = Path(original).suffix.lower()
+    cloudinary_ready()
+    original = (file.filename or "presentation").replace("\\", "/").rsplit("/", 1)[-1]
+    ext = f".{original.rsplit('.', 1)[-1].lower()}" if "." in original else ""
     if ext not in ALLOWED: raise HTTPException(415, "Only .ppt, .pptx and .pdf files are accepted.")
-    storage = Path(PPT_STORAGE_DIR); storage.mkdir(parents=True, exist_ok=True)
-    target = storage / f"{uuid.uuid4().hex}{ext}"
-    size = 0
+    content = await file.read(MAX_BYTES + 1)
+    if len(content) > MAX_BYTES: raise HTTPException(413, "File must be 25 MB or smaller.")
+    signature = content[:8]
+    valid = (ext == ".pdf" and signature.startswith(b"%PDF")) or (ext == ".ppt" and signature.startswith(bytes.fromhex("D0CF11E0"))) or (ext == ".pptx" and signature.startswith(b"PK"))
+    if not valid: raise HTTPException(415, "The file content does not match its extension.")
+    now = datetime.now(timezone.utc); previous = item.get("ppt", {}).get("current") or {}; version = int(previous.get("version", previous.get("version_number", 0))) + 1
+    if previous.get("cloudinary_public_id"):
+        try: cloudinary.uploader.destroy(previous["cloudinary_public_id"], resource_type="raw", type="authenticated", invalidate=True)
+        except Exception: pass
+    reference_id = item["registration_id"]; extension = ext.removeprefix("."); public_id = cloudinary_public_id(reference_id, extension)
     try:
-        with target.open("wb") as out:
-            while chunk := await file.read(1024 * 1024):
-                size += len(chunk)
-                if size > MAX_BYTES: raise HTTPException(413, "File must be 25 MB or smaller.")
-                out.write(chunk)
-        signature = target.read_bytes()[:8]
-        valid = (ext == ".pdf" and signature.startswith(b"%PDF")) or (ext == ".ppt" and signature.startswith(bytes.fromhex("D0CF11E0"))) or (ext == ".pptx" and signature.startswith(b"PK"))
-        if not valid: raise HTTPException(415, "The file content does not match its extension.")
-    except Exception:
-        target.unlink(missing_ok=True); raise
-    now = datetime.now(timezone.utc); history = item.get("ppt", {}).get("history", []); version = len(history) + 1
-    reason = "Resubmission" if history else "Initial submission"
-    entry = {"version": version, "filename": original, "storage_key": target.name, "content_type": file.content_type or "application/octet-stream", "size": size, "uploaded_at": now, "reason": reason, "status": "PPT Submitted", "file_name": target.name, "original_file_name": original, "file_size": size, "file_type": ext.removeprefix("."), "upload_timestamp": now, "version_number": version, "uploaded_by": item.get("leader", {}).get("email"), "storage_path": target.name}
-    current = {**entry, "last_modified": now, "reviewer_remarks": "", "internal_notes": ""}
-    await registration_collection.update_one({"_id": item["_id"]}, {"$set": {"ppt": {"current": current, "history": [*history, entry]}, "status": "PPT Submitted", "updated_at": now}})
-    await audit_collection.insert_one({"admin_id": "team", "admin_name": item.get("leader", {}).get("name", "Team leader"), "action": "Re-uploaded PPT" if version > 1 else "Uploaded PPT", "registration_id": str(item["_id"]), "detail": f"Version {version}: {original}", "timestamp": now})
+        result = cloudinary.uploader.upload(BytesIO(content), resource_type="raw", type="authenticated", upload_preset=CLOUDINARY_UPLOAD_PRESET, public_id=public_id, overwrite=True, filename_override=f"{reference_id}.{extension}")
+    except Exception as error:
+        raise HTTPException(502, "Cloudinary could not store the presentation.") from error
+    current = {"submitted": True, "file_name": f"{reference_id}.{extension}", "filename": f"{reference_id}.{extension}", "original_file_name": original, "cloudinary_public_id": result["public_id"], "secure_url": result.get("secure_url"), "bytes": result.get("bytes", len(content)), "size": result.get("bytes", len(content)), "format": extension, "uploaded_at": now, "upload_timestamp": now, "version": version, "version_number": version, "status": "PPT Submitted", "file_type": extension, "file_size": result.get("bytes", len(content)), "uploaded_by": item.get("leader", {}).get("email"), "reviewer_remarks": "", "internal_notes": "", "last_modified": now}
+    await registration_collection.update_one({"_id": item["_id"]}, {"$set": {"ppt": {"current": current}, "status": "PPT Submitted", "updated_at": now}})
+    await audit_collection.insert_one({"admin_id": "team", "admin_name": item.get("leader", {}).get("name", "Team leader"), "action": "Team replaced PPT" if previous else "Team uploaded PPT", "registration_id": str(item["_id"]), "detail": f"Version {version}: {original}", "timestamp": now})
     summary = team_summary(item)
-    await log_email(summary["leader_email"], "PPT submission received", f"Hello {summary['leader_name']},\n\nWe received Version {version} of {summary['team_name']}'s PPT on {now:%d %b %Y, %I:%M %p UTC}.\nReference ID: {summary['reference_id']}\n\nYou may re-upload before the deadline, if required.\n{PORTAL_URL}/ppt-submission")
-    return {"success": True, "version": version, "uploaded_at": now, "status": "PPT Submitted"}
-
-@router.get("/download/{registration_id}/{version}")
-async def signed_download(registration_id: str, version: int, token: str):
-    try: payload = jwt.decode(token, secret(), algorithms=["HS256"])
-    except jwt.PyJWTError: raise HTTPException(401, "Download link is invalid or expired.")
-    if payload.get("purpose") != "ppt_download" or payload.get("registration_id") != registration_id or payload.get("version") != version: raise HTTPException(403, "Download link is not authorized.")
-    item = await registration_collection.find_one({"_id": ObjectId(registration_id)})
-    entry = next((x for x in item.get("ppt", {}).get("history", []) if x["version"] == version), None) if item else None
-    path = Path(PPT_STORAGE_DIR) / entry["storage_key"] if entry else None
-    if not path or not path.is_file(): raise HTTPException(404, "The requested upload is unavailable.")
-    return FileResponse(path, media_type=entry.get("content_type"), filename=entry["filename"])
+    await log_email(summary["leader_email"], "PPT Submission Received", f"Hello {summary['leader_name']},\n\nPPT Submission Received\nTeam: {summary['team_name']}\nReference ID: {summary['reference_id']}\nUpload time: {now:%d %b %Y, %I:%M %p UTC}\nStatus: PPT Submitted\n\nThe file can be replaced before the submission deadline.\n{PORTAL_URL}/ppt-submission")
+    return {"success": True, "file_name": current["file_name"], "version": version, "uploaded_at": now, "status": "PPT Submitted"}

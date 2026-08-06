@@ -2,12 +2,18 @@ from fastapi import APIRouter
 from app.schemas.update_registration import UpdateRegistration
 from app.schemas.registration import Registration
 from app.services.registration_service import registration_service
+from app.mongodb import settings_collection
 from typing import Optional
 from fastapi import Query
 router = APIRouter(
     prefix="/registrations",
     tags=["Registrations"]
 )
+
+@router.get("/status")
+async def registration_status():
+    control = await settings_collection.find_one({"key": "registration_control"})
+    return {"is_open": True if not control else control.get("is_open", True)}
 
 
 @router.post("/")

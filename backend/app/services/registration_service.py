@@ -1,7 +1,7 @@
 from bson import ObjectId
 from fastapi import HTTPException
 
-from app.mongodb import registration_collection
+from app.mongodb import registration_collection, settings_collection
 from app.validators.registration_validator import registration_validator
 import re
 from datetime import datetime
@@ -14,6 +14,10 @@ class RegistrationService:
 
 
     async def create_registration(self, registration: dict):
+
+        control = await settings_collection.find_one({"key": "registration_control"})
+        if control and control.get("is_open") is False:
+            raise HTTPException(status_code=403, detail="Registrations are currently closed. Please check back later or contact the SIH Coordinators.")
 
         await registration_validator.validate_registration(registration)
 

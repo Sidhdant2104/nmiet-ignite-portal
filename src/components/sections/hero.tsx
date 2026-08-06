@@ -9,7 +9,7 @@ import { MagneticButton } from "@/components/motion/magnetic-button";
 import { AnnouncementTicker } from "@/components/sections/announcement-ticker";
 import { SupportedBySection } from "@/components/sections/supported-by";
 import InnovationMap from "@/components/InnovationMap";
-import { themesQuery } from "@/lib/api";
+import { registrationStatusQuery, themesQuery } from "@/lib/api";
 
 const ease = [0.22, 1, 0.36, 1] as const;
 
@@ -29,6 +29,7 @@ const innovationHubs = [
 export function Hero() {
   const ref = useRef<HTMLDivElement>(null);
   const { data: themes } = useQuery(themesQuery);
+  const { data: registrationControl } = useQuery(registrationStatusQuery);
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end start"] });
   const yFar = useTransform(scrollYProgress, [0, 1], [0, 140]);
   const yNear = useTransform(scrollYProgress, [0, 1], [0, -80]);
@@ -86,11 +87,11 @@ export function Hero() {
             transition={{ duration: 0.7, delay: 0.45, ease }}
             className="mt-9 flex flex-wrap items-center gap-3"
           >
-            <Link to="/register" aria-label="Register your team now">
+            {registrationControl?.is_open !== false ? <Link to="/register" aria-label="Register your team now">
               <MagneticButton className="bg-primary px-7 py-3.5 text-primary-foreground shadow-glow hover:brightness-105">
                 Register Now <ArrowRight className="h-4 w-4" />
               </MagneticButton>
-            </Link>
+            </Link> : null}
             <Link to="/problem-statements">
               <MagneticButton className="border border-border bg-card/70 px-7 py-3.5 text-foreground backdrop-blur hover:bg-accent">
                 <Compass className="h-4 w-4 text-brand-blue" /> Explore Problem Statements

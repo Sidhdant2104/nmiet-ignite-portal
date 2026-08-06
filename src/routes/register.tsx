@@ -42,7 +42,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { submitRegistration, themesQuery } from "@/lib/api";
+import { registrationStatusQuery, submitRegistration, themesQuery } from "@/lib/api";
 import { departments } from "@/lib/departments";
 
 const title = "Register your team — NMIET SIH Portal";
@@ -185,6 +185,7 @@ function RegisterPage() {
   const [draftLoaded, setDraftLoaded] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { data: themes } = useQuery(themesQuery);
+  const registrationControl = useQuery(registrationStatusQuery);
   console.log("Themes:", themes);
 
   const form = useForm<FormValues>({
@@ -295,6 +296,10 @@ function RegisterPage() {
     }
     setConfirmOpen(true);
   }, [trigger]);
+
+  if (registrationControl.data && !registrationControl.data.is_open) {
+    return <RegistrationClosed />;
+  }
 
   if (submitted) {
     return <SuccessScreen reference={submitted.reference} values={submitted.values} />;
@@ -977,38 +982,6 @@ function SuccessScreen({ reference, values }: { reference: string; values: FormV
           <span className="mt-2 font-mono text-2xl font-semibold">{reference}</span>
         </motion.div>
 
-        <div className="mt-10 grid gap-4 text-left sm:grid-cols-2">
-          {groups.map((g) => (
-            <div key={g.title} className="rounded-3xl border border-border bg-card p-5 shadow-soft">
-              <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                {g.title}
-              </h2>
-              <dl className="mt-4 space-y-2.5">
-                {g.rows.map(([label, value]) => (
-                  <div key={label} className="grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)] gap-3">
-                    <dt className="truncate text-xs text-muted-foreground">{label}</dt>
-                    <dd className="min-w-0 break-words text-sm font-medium">{value || "—"}</dd>
-                  </div>
-                ))}
-                {g.subsections?.map((sub) => (
-                  <div key={sub.title} className="border-t border-border pt-2">
-                    <p className="mb-1.5 text-xs font-semibold">{sub.title}</p>
-                    {sub.rows.map(([label, value]) => (
-                      <div
-                        key={`${sub.title}-${label}`}
-                        className="mb-1.5 grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)] gap-3"
-                      >
-                        <dt className="truncate text-xs text-muted-foreground">{label}</dt>
-                        <dd className="min-w-0 break-words text-sm font-medium">{value || "—"}</dd>
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </dl>
-            </div>
-          ))}
-        </div>
-
         <section className="mt-14 text-left" aria-labelledby="next-steps-title">
           <div className="text-center">
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">Next steps</p>
@@ -1016,7 +989,7 @@ function SuccessScreen({ reference, values }: { reference: string; values: FormV
             <p className="mx-auto mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">Your registration has been completed successfully. Complete the remaining steps before the submission deadline.</p>
           </div>
           <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {[{icon:"📥",title:"Download PPT Template",body:"Download the official NMIET SIH PPT template before preparing your presentation.",button:"Download Template",to:"/ppt-template"},{icon:"📖",title:"Submission Guidelines",body:"Read the presentation format, evaluation criteria, submission rules and important deadlines.",button:"View Guidelines",to:"/submission-guidelines"},{icon:"📤",title:"Submit PPT",body:"Upload your presentation before the deadline. Teams may replace their submission until the deadline closes.",button:"Submit PPT",to:"/ppt-submission"}].map((item,index)=><motion.article key={item.title} initial={{opacity:0,y:12}} animate={{opacity:1,y:0}} transition={{delay:0.35+index*.06}} className="flex min-h-60 flex-col rounded-3xl border border-border bg-card p-5 shadow-soft transition-transform duration-200 hover:-translate-y-1 hover:shadow-lift"><span className="text-2xl" aria-hidden>{item.icon}</span><h3 className="mt-4 font-display text-lg font-semibold">{item.title}</h3><p className="mt-2 text-sm leading-relaxed text-muted-foreground">{item.body}</p><Link to={item.to as "/ppt-template"} className="mt-auto pt-5"><MagneticButton className="w-full bg-primary px-4 py-2.5 text-primary-foreground hover:brightness-105">{item.button}</MagneticButton></Link></motion.article>)}
+            {[{icon:"📥",title:"Download PPT Template",body:"Download the official NMIET SIH PPT template.",button:"Download Template",to:"/ppt-template"},{icon:"📖",title:"Submission Guidelines",body:"Read the official format, evaluation criteria and rules.",button:"View Guidelines",to:"/guidelines"},{icon:"📤",title:"Submit PPT",body:"Upload the team's presentation before the deadline. Re-upload is available until submissions close.",button:"Submit PPT",to:"/ppt-submission"}].map((item,index)=><motion.article key={item.title} initial={{opacity:0,y:12}} animate={{opacity:1,y:0}} transition={{delay:0.35+index*.06}} className="flex min-h-60 flex-col rounded-3xl border border-border bg-card p-5 shadow-soft transition-transform duration-200 hover:-translate-y-1 hover:shadow-lift"><span className="text-2xl" aria-hidden>{item.icon}</span><h3 className="mt-4 font-display text-lg font-semibold">{item.title}</h3><p className="mt-2 text-sm leading-relaxed text-muted-foreground">{item.body}</p><Link to={item.to as "/ppt-template"} className="mt-auto pt-5"><MagneticButton className="w-full bg-primary px-4 py-2.5 text-primary-foreground hover:brightness-105">{item.button}</MagneticButton></Link></motion.article>)}
           </div>
           <div className="mt-5 flex gap-3 rounded-2xl border border-primary/20 bg-primary/10 p-4 text-sm"><CircleCheckBig className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden/><p className="leading-relaxed text-muted-foreground">A confirmation email has been sent to the Team Leader containing your Reference ID, important links and future instructions.</p></div>
           <p className="mt-7 text-center text-sm text-muted-foreground">Need assistance? Email <a className="font-semibold text-primary hover:underline" href="mailto:sih@nmiet.edu.in">sih@nmiet.edu.in</a> or Contact the SIH Coordinator.</p>
@@ -1048,4 +1021,8 @@ function SuccessScreen({ reference, values }: { reference: string; values: FormV
       </div>
     </div>
   );
+}
+
+function RegistrationClosed() {
+  return <div className="relative min-h-dvh overflow-hidden pb-28 pt-32 lg:pt-40"><AmbientBackdrop className="-z-10"/><div className="shell max-w-2xl text-center"><ShieldCheck className="mx-auto h-14 w-14 text-primary"/><p className="mt-7 text-xs font-bold uppercase tracking-[.18em] text-primary">NMIET SIH Portal</p><h1 className="mt-3 font-display text-4xl font-semibold">Registrations are currently closed.</h1><p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-muted-foreground">Please check back later or contact the SIH Coordinators.</p><Link to="/"><MagneticButton className="mt-8 bg-primary px-6 py-3 text-primary-foreground">Return home <Home className="h-4 w-4"/></MagneticButton></Link></div></div>;
 }

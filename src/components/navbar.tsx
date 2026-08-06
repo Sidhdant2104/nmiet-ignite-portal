@@ -1,10 +1,12 @@
 import { Link, useLocation } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { AnimatePresence, motion, useScroll, useTransform } from "framer-motion";
 import { ChevronDown, Menu, Moon, Sun, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { MagneticButton } from "@/components/motion/magnetic-button";
 import { useTheme } from "@/hooks/use-theme";
 import { cn } from "@/lib/utils";
+import { registrationStatusQuery } from "@/lib/api";
 
 const primaryNavItems = [
   { label: "Home", href: "/#home" },
@@ -60,6 +62,8 @@ export function Navbar() {
   const moreRef = useRef<HTMLLIElement>(null);
   const location = useLocation();
   const { scrollY } = useScroll();
+  const registrationControl = useQuery(registrationStatusQuery);
+  const registrationsOpen = registrationControl.data?.is_open !== false;
   const [scrolled, setScrolled] = useState(false);
   const progress = useTransform(scrollY, [0, 2400], ["0%", "100%"]);
 
@@ -204,11 +208,7 @@ export function Navbar() {
             <div className="hidden sm:block">
               <ThemeToggle />
             </div>
-            <Link to="/register" className="hidden sm:block">
-              <MagneticButton className="bg-primary text-primary-foreground shadow-glow hover:brightness-105">
-                Register
-              </MagneticButton>
-            </Link>
+            {registrationsOpen ? <Link to="/register" className="hidden sm:block"><MagneticButton className="bg-primary text-primary-foreground shadow-glow hover:brightness-105">Register</MagneticButton></Link> : null}
             <button
               type="button"
               onClick={() => setOpen((value) => !value)}
@@ -281,7 +281,7 @@ export function Navbar() {
                   )}
                 </AnimatePresence>
               </li>
-              <li className="pt-2">
+              {registrationsOpen ? <li className="pt-2">
                 <Link
                   to="/register"
                   onClick={() => setOpen(false)}
@@ -289,7 +289,7 @@ export function Navbar() {
                 >
                   Register your team
                 </Link>
-              </li>
+              </li> : null}
             </ul>
           </motion.div>
         )}
