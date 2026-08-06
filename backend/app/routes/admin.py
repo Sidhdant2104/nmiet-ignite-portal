@@ -6,12 +6,10 @@ environment configuration or written to the database.
 """
 from datetime import datetime, timedelta, timezone
 from typing import Literal, Optional
-import asyncio
+import os
 
 import bcrypt
 import jwt
-import cloudinary.utils
-import requests
 from bson import ObjectId
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
@@ -25,6 +23,7 @@ from app.config import ADMIN_BOOTSTRAP_EMAIL, ADMIN_BOOTSTRAP_PASSWORD_HASH, ADM
 from copy import deepcopy
 from app.mongodb import admin_users_collection, announcement_collection, audit_collection, registration_collection, settings_collection
 from app.routes.ppt import STATUS as PPT_STATUSES, log_email
+from app.services.storage import create_signed_download, create_signed_preview, download_file as storage_download
 
 router = APIRouter(prefix="/admin", tags=["Administration"])
 Role = Literal["super_admin", "faculty", "student_spoc", "student_coordinator"]
@@ -140,11 +139,10 @@ def ppt_scope(user: dict):
 def serialize(item: dict):
     safe = deepcopy(item); safe["_id"] = str(safe["_id"])
     for upload in safe.get("ppt", {}).get("history", []):
-        upload.pop("storage_key", None); upload.pop("storage_path", None)
+        upload.pop("storage_key", None)
     current = safe.get("ppt", {}).get("current")
     if current:
-        current.pop("storage_key", None); current.pop("storage_path", None)
-        current.pop("cloudinary_public_id", None); current.pop("secure_url", None)
+        current.pop("storage_key", None)
     return safe
 
 def registration_query(search: Optional[str] = None, status: Optional[str] = None, theme: Optional[str] = None, category: Optional[str] = None, date_from: Optional[datetime] = None, date_to: Optional[datetime] = None, include_deleted: bool = False):
@@ -370,16 +368,8 @@ async def _ppt_file(registration_id: str, user: dict):
     except Exception: raise HTTPException(400, "Invalid registration ID.")
     item = await registration_collection.find_one({"_id": object_id, **ppt_scope(user)})
     current = item.get("ppt", {}).get("current") if item else None
-    if not current or not current.get("cloudinary_public_id"): raise HTTPException(404, "PPT submission not found or not permitted.")
+    if not current or not current.get("storage_key"): raise HTTPException(404, "PPT submission not found or not permitted.")
     return item, current
-
-async def _cloudinary_content(current: dict):
-    try:
-        url, _ = cloudinary.utils.cloudinary_url(current["cloudinary_public_id"], resource_type="raw", type="authenticated", secure=True, sign_url=True, expires_at=int((datetime.now(timezone.utc) + timedelta(minutes=5)).timestamp()))
-        response = await asyncio.to_thread(requests.get, url, timeout=30)
-        response.raise_for_status()
-        return response.content
-    except Exception as error: raise HTTPException(502, "Cloudinary could not retrieve the presentation.") from error
 
 @router.get("/ppt/submissions/{registration_id}")
 @router.get("/ppt/{registration_id}")
@@ -390,17 +380,25 @@ async def ppt_submission(registration_id: str, user=Depends(require("view_ppt"))
 @router.get("/ppt/{registration_id}/download")
 async def ppt_download(registration_id: str, user=Depends(require("download_ppt"))):
     _, current = await _ppt_file(registration_id, user)
-    content = await _cloudinary_content(current)
+    try:
+        signed_url = create_signed_download(current["storage_key"], expires_in=60)
+    except RuntimeError as error:
+        raise HTTPException(502, "Storage could not generate a download link.") from error
     await audit(user, "Faculty downloaded PPT", registration_id, f"Version {current.get('version')}: {current.get('file_name')}")
-    return StreamingResponse(BytesIO(content), media_type="application/octet-stream", headers={"Content-Disposition": f'attachment; filename="{current.get("file_name", "presentation")}"'})
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url=signed_url, status_code=302)
 
 @router.get("/ppt/{registration_id}/preview")
 async def ppt_preview(registration_id: str, user=Depends(require("download_ppt"))):
     _, current = await _ppt_file(registration_id, user)
     if current.get("format") != "pdf": raise HTTPException(422, "Preview is available for PDF uploads. Download PPT/PPTX to review it.")
-    content = await _cloudinary_content(current)
+    try:
+        signed_url = create_signed_preview(current["storage_key"], expires_in=60)
+    except RuntimeError as error:
+        raise HTTPException(502, "Storage could not generate a preview link.") from error
     await audit(user, "Previewed PPT", registration_id, f"Version {current.get('version')}: {current.get('file_name')}")
-    return StreamingResponse(BytesIO(content), media_type="application/pdf", headers={"Content-Disposition": f'inline; filename="{current.get("file_name", "presentation.pdf")}"'})
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url=signed_url, status_code=302)
 
 @router.patch("/ppt/submissions/{registration_id}", dependencies=[Depends(csrf_guard)])
 async def review_ppt(registration_id: str, payload: PptReviewPayload, user=Depends(require("review_ppt"))):

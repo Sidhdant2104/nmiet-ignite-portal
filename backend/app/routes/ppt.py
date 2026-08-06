@@ -6,126 +6,327 @@ from email.message import EmailMessage
 from io import BytesIO
 
 import jwt
-import cloudinary
-import cloudinary.uploader
 from bson import ObjectId
-from fastapi import APIRouter, File, Form, Header, HTTPException, UploadFile
+from fastapi import APIRouter, File, Header, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from zipfile import ZIP_DEFLATED, ZipFile
 from pydantic import BaseModel, EmailStr
 
-from app.config import ADMIN_JWT_SECRET, PORTAL_URL, PPT_SUBMISSION_DEADLINE, SMTP_FROM, SMTP_HOST, SMTP_PASSWORD, SMTP_PORT, SMTP_USERNAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET, CLOUDINARY_CLOUD_NAME, CLOUDINARY_UPLOAD_PRESET
+from app.config import (
+    ADMIN_JWT_SECRET, PORTAL_URL, PPT_SUBMISSION_DEADLINE,
+    SMTP_FROM, SMTP_HOST, SMTP_PASSWORD, SMTP_PORT, SMTP_USERNAME,
+)
 from app.mongodb import audit_collection, email_collection, registration_collection
+from app.services.storage import (
+    original_key, preview_key, sha256_hex,
+    upload_file as storage_upload,
+    convert_to_pdf_if_needed,
+    SUPABASE_BUCKET,
+)
 
 router = APIRouter(prefix="/ppt", tags=["PPT submissions"])
 MAX_BYTES = 25 * 1024 * 1024
 ALLOWED = {".ppt", ".pptx", ".pdf"}
-STATUS = {"Awaiting PPT", "PPT Submitted", "Under Review", "Revision Requested", "Approved", "Rejected", "Qualified"}
+STATUS = {
+    "Awaiting PPT", "PPT Submitted", "Under Review",
+    "Revision Requested", "Approved", "Rejected", "Qualified",
+}
 
-cloudinary.config(cloud_name=CLOUDINARY_CLOUD_NAME, api_key=CLOUDINARY_API_KEY, api_secret=CLOUDINARY_API_SECRET, secure=True)
+CONTENT_TYPES = {
+    "pdf":  "application/pdf",
+    "ppt":  "application/vnd.ms-powerpoint",
+    "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+}
+
+
+# ---------------------------------------------------------------------------
+# Pydantic models
+# ---------------------------------------------------------------------------
 
 class VerifyPayload(BaseModel):
     reference_id: str
     leader_email: EmailStr
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
 def secret():
     if not ADMIN_JWT_SECRET or len(ADMIN_JWT_SECRET) < 32:
         raise HTTPException(503, "PPT signing is not configured.")
     return ADMIN_JWT_SECRET
 
+
 def deadline():
-    if not PPT_SUBMISSION_DEADLINE: return None
-    try: return datetime.fromisoformat(PPT_SUBMISSION_DEADLINE.replace("Z", "+00:00"))
-    except ValueError: return None
+    if not PPT_SUBMISSION_DEADLINE:
+        return None
+    try:
+        return datetime.fromisoformat(PPT_SUBMISSION_DEADLINE.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
 
 def team_summary(item):
     team, leader = item.get("team", {}), item.get("leader", {})
-    return {"id": str(item["_id"]), "team_name": team.get("teamName"), "reference_id": item.get("registration_id"), "ps_id": team.get("psId"), "theme": team.get("theme"), "category": team.get("category"), "leader_name": leader.get("name"), "leader_email": leader.get("email")}
+    return {
+        "id": str(item["_id"]),
+        "team_name": team.get("teamName"),
+        "reference_id": item.get("registration_id"),
+        "ps_id": team.get("psId"),
+        "theme": team.get("theme"),
+        "category": team.get("category"),
+        "leader_name": leader.get("name"),
+        "leader_email": leader.get("email"),
+    }
+
 
 async def log_email(to: str, subject: str, body: str):
-    event = {"to": to, "subject": subject, "body": body, "created_at": datetime.now(timezone.utc), "delivery": "queued" if SMTP_HOST else "not_configured"}
+    event = {
+        "to": to, "subject": subject, "body": body,
+        "created_at": datetime.now(timezone.utc),
+        "delivery": "queued" if SMTP_HOST else "not_configured",
+    }
     await email_collection.insert_one(event)
-    if not SMTP_HOST: return
-    msg = EmailMessage(); msg["From"] = SMTP_FROM; msg["To"] = to; msg["Subject"] = subject; msg.set_content(body)
+    if not SMTP_HOST:
+        return
+    msg = EmailMessage()
+    msg["From"] = SMTP_FROM
+    msg["To"] = to
+    msg["Subject"] = subject
+    msg.set_content(body)
     try:
         with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10) as server:
             server.starttls()
-            if SMTP_USERNAME: server.login(SMTP_USERNAME, SMTP_PASSWORD or "")
+            if SMTP_USERNAME:
+                server.login(SMTP_USERNAME, SMTP_PASSWORD or "")
             server.send_message(msg)
-        await email_collection.update_one({"_id": event.get("_id")}, {"$set": {"delivery": "sent", "sent_at": datetime.now(timezone.utc)}})
+        await email_collection.update_one(
+            {"_id": event.get("_id")},
+            {"$set": {"delivery": "sent", "sent_at": datetime.now(timezone.utc)}},
+        )
     except Exception as error:
-        await email_collection.update_one({"to": to, "subject": subject, "created_at": event["created_at"]}, {"$set": {"delivery": "failed", "error": str(error)}})
+        await email_collection.update_one(
+            {"to": to, "subject": subject, "created_at": event["created_at"]},
+            {"$set": {"delivery": "failed", "error": str(error)}},
+        )
+
 
 def upload_token(item):
-    return jwt.encode({"sub": str(item["_id"]), "purpose": "ppt_upload", "exp": datetime.now(timezone.utc) + timedelta(minutes=30)}, secret(), algorithm="HS256")
+    return jwt.encode(
+        {
+            "sub": str(item["_id"]),
+            "purpose": "ppt_upload",
+            "exp": datetime.now(timezone.utc) + timedelta(minutes=30),
+        },
+        secret(),
+        algorithm="HS256",
+    )
 
-def cloudinary_ready():
-    if not CLOUDINARY_CLOUD_NAME or not CLOUDINARY_API_KEY or not CLOUDINARY_API_SECRET:
-        raise HTTPException(503, "Cloudinary storage is not configured.")
-
-def cloudinary_public_id(reference_id: str, extension: str):
-    return f"nmiet-sih/ppt/2026/{reference_id}/{reference_id}.{extension}"
 
 async def item_from_upload_token(authorization: Optional[str]):
     token = authorization.removeprefix("Bearer ") if authorization else ""
-    try: payload = jwt.decode(token, secret(), algorithms=["HS256"])
-    except jwt.PyJWTError: raise HTTPException(401, "Upload session is invalid or has expired.")
-    if payload.get("purpose") != "ppt_upload": raise HTTPException(401, "Invalid upload session.")
-    item = await registration_collection.find_one({"_id": ObjectId(payload["sub"]), "isDeleted": {"$ne": True}})
-    if not item: raise HTTPException(404, "Registration not found.")
+    try:
+        payload = jwt.decode(token, secret(), algorithms=["HS256"])
+    except jwt.PyJWTError:
+        raise HTTPException(401, "Upload session is invalid or has expired.")
+    if payload.get("purpose") != "ppt_upload":
+        raise HTTPException(401, "Invalid upload session.")
+    item = await registration_collection.find_one(
+        {"_id": ObjectId(payload["sub"]), "isDeleted": {"$ne": True}}
+    )
+    if not item:
+        raise HTTPException(404, "Registration not found.")
     return item
+
+
+# ---------------------------------------------------------------------------
+# Routes
+# ---------------------------------------------------------------------------
 
 @router.get("/template")
 async def download_template():
     """A compact, valid starter deck; organizers can override the URL with VITE_PPT_TEMPLATE_URL."""
     parts = {
-        "[Content_Types].xml": '''<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/><Override PartName="/ppt/slides/slide1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/></Types>''',
-        "_rels/.rels": '''<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="ppt/presentation.xml"/></Relationships>''',
-        "ppt/presentation.xml": '''<?xml version="1.0" encoding="UTF-8"?><p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:sldIdLst><p:sldId id="256" r:id="rId1"/></p:sldIdLst><p:sldSz cx="12192000" cy="6858000" type="screen16x9"/><p:notesSz cx="6858000" cy="9144000"/></p:presentation>''',
-        "ppt/_rels/presentation.xml.rels": '''<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"/></Relationships>''',
-        "ppt/slides/slide1.xml": '''<?xml version="1.0" encoding="UTF-8"?><p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Title"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr><p:spPr/><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:rPr lang="en-US" sz="3200" b="1"/><a:t>NMIET SIH 2026</a:t></a:r><a:endParaRPr lang="en-US"/></a:p><a:p><a:r><a:rPr lang="en-US" sz="1800"/><a:t>Team Name | PS ID | Theme</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>''',
+        "[Content_Types].xml": '<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/><Override PartName="/ppt/slides/slide1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/></Types>',
+        "_rels/.rels": '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="ppt/presentation.xml"/></Relationships>',
+        "ppt/presentation.xml": '<?xml version="1.0" encoding="UTF-8"?><p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:sldIdLst><p:sldId id="256" r:id="rId1"/></p:sldIdLst><p:sldSz cx="12192000" cy="6858000" type="screen16x9"/><p:notesSz cx="6858000" cy="9144000"/></p:presentation>',
+        "ppt/_rels/presentation.xml.rels": '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"/></Relationships>',
+        "ppt/slides/slide1.xml": '<?xml version="1.0" encoding="UTF-8"?><p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Title"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr><p:spPr/><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:rPr lang="en-US" sz="3200" b="1"/><a:t>NMIET SIH 2026</a:t></a:r><a:endParaRPr lang="en-US"/></a:p><a:p><a:r><a:rPr lang="en-US" sz="1800"/><a:t>Team Name | PS ID | Theme</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>',
     }
     out = BytesIO()
     with ZipFile(out, "w", ZIP_DEFLATED) as archive:
-        for name, content in parts.items(): archive.writestr(name, content)
+        for name, content in parts.items():
+            archive.writestr(name, content)
     out.seek(0)
-    return StreamingResponse(out, media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation", headers={"Content-Disposition": 'attachment; filename="NMIET-SIH-2026-PPT-Template.pptx"'})
+    return StreamingResponse(
+        out,
+        media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        headers={"Content-Disposition": 'attachment; filename="NMIET-SIH-2026-PPT-Template.pptx"'},
+    )
+
 
 @router.post("/verify")
 async def verify(payload: VerifyPayload):
-    item = await registration_collection.find_one({"registration_id": payload.reference_id.strip().upper(), "leader.email": payload.leader_email.lower(), "isDeleted": {"$ne": True}})
-    if not item: raise HTTPException(404, "No active registration matches that Reference ID and leader email.")
+    item = await registration_collection.find_one(
+        {
+            "registration_id": payload.reference_id.strip().upper(),
+            "leader.email": payload.leader_email.lower(),
+            "isDeleted": {"$ne": True},
+        }
+    )
+    if not item:
+        raise HTTPException(404, "No active registration matches that Reference ID and leader email.")
     until = deadline()
-    if until and datetime.now(timezone.utc) > until: raise HTTPException(403, "The PPT submission deadline has passed.")
+    if until and datetime.now(timezone.utc) > until:
+        raise HTTPException(403, "The PPT submission deadline has passed.")
     summary = team_summary(item)
-    return {**summary, "token": upload_token(item), "deadline": until, "submission": item.get("ppt", {}).get("current")}
+    return {
+        **summary,
+        "token": upload_token(item),
+        "deadline": until,
+        "submission": item.get("ppt", {}).get("current"),
+    }
+
 
 @router.post("/upload")
-async def upload(file: UploadFile = File(...), authorization: Optional[str] = Header(default=None)):
+async def upload(
+    file: UploadFile = File(...),
+    authorization: Optional[str] = Header(default=None),
+):
     item = await item_from_upload_token(authorization)
     until = deadline()
-    if until and datetime.now(timezone.utc) > until: raise HTTPException(403, "The PPT submission deadline has passed.")
-    cloudinary_ready()
-    original = (file.filename or "presentation").replace("\\", "/").rsplit("/", 1)[-1]
-    ext = f".{original.rsplit('.', 1)[-1].lower()}" if "." in original else ""
-    if ext not in ALLOWED: raise HTTPException(415, "Only .ppt, .pptx and .pdf files are accepted.")
+    if until and datetime.now(timezone.utc) > until:
+        raise HTTPException(403, "The PPT submission deadline has passed.")
+
+    # --- Filename + extension ---
+    original_filename = (file.filename or "presentation").replace("\\", "/").rsplit("/", 1)[-1]
+    ext = f".{original_filename.rsplit('.', 1)[-1].lower()}" if "." in original_filename else ""
+    if ext not in ALLOWED:
+        raise HTTPException(415, "Only .ppt, .pptx and .pdf files are accepted.")
+
+    # --- Read + size guard ---
     content = await file.read(MAX_BYTES + 1)
-    if len(content) > MAX_BYTES: raise HTTPException(413, "File must be 25 MB or smaller.")
+    if len(content) > MAX_BYTES:
+        raise HTTPException(413, "File must be 25 MB or smaller.")
+
+    # --- Magic-byte validation ---
     signature = content[:8]
-    valid = (ext == ".pdf" and signature.startswith(b"%PDF")) or (ext == ".ppt" and signature.startswith(bytes.fromhex("D0CF11E0"))) or (ext == ".pptx" and signature.startswith(b"PK"))
-    if not valid: raise HTTPException(415, "The file content does not match its extension.")
-    now = datetime.now(timezone.utc); previous = item.get("ppt", {}).get("current") or {}; version = int(previous.get("version", previous.get("version_number", 0))) + 1
-    if previous.get("cloudinary_public_id"):
-        try: cloudinary.uploader.destroy(previous["cloudinary_public_id"], resource_type="raw", type="authenticated", invalidate=True)
-        except Exception: pass
-    reference_id = item["registration_id"]; extension = ext.removeprefix("."); public_id = cloudinary_public_id(reference_id, extension)
+    valid = (
+        (ext == ".pdf"  and signature.startswith(b"%PDF"))
+        or (ext == ".ppt"  and signature.startswith(bytes.fromhex("D0CF11E0")))
+        or (ext == ".pptx" and signature.startswith(b"PK"))
+    )
+    if not valid:
+        raise HTTPException(415, "The file content does not match its extension.")
+
+    # --- Version + previous ---
+    now = datetime.now(timezone.utc)
+    ppt_doc = item.get("ppt", {})
+    previous = ppt_doc.get("current") or {}
+    history = list(ppt_doc.get("history", []))
+    version = int(previous.get("version", 0)) + 1
+
+    reference_id = item["registration_id"]
+    extension = ext.removeprefix(".")
+    content_type = CONTENT_TYPES.get(extension, "application/octet-stream")
+
+    # --- SHA-256 ---
+    checksum = sha256_hex(content)
+
+    # --- Upload original ---
+    orig_key = original_key(reference_id, version, extension)
     try:
-        result = cloudinary.uploader.upload(BytesIO(content), resource_type="raw", type="authenticated", upload_preset=CLOUDINARY_UPLOAD_PRESET, public_id=public_id, overwrite=True, filename_override=f"{reference_id}.{extension}")
-    except Exception as error:
-        raise HTTPException(502, "Cloudinary could not store the presentation.") from error
-    current = {"submitted": True, "file_name": f"{reference_id}.{extension}", "filename": f"{reference_id}.{extension}", "original_file_name": original, "cloudinary_public_id": result["public_id"], "secure_url": result.get("secure_url"), "bytes": result.get("bytes", len(content)), "size": result.get("bytes", len(content)), "format": extension, "uploaded_at": now, "upload_timestamp": now, "version": version, "version_number": version, "status": "PPT Submitted", "file_type": extension, "file_size": result.get("bytes", len(content)), "uploaded_by": item.get("leader", {}).get("email"), "reviewer_remarks": "", "internal_notes": "", "last_modified": now}
-    await registration_collection.update_one({"_id": item["_id"]}, {"$set": {"ppt": {"current": current}, "status": "PPT Submitted", "updated_at": now}})
-    await audit_collection.insert_one({"admin_id": "team", "admin_name": item.get("leader", {}).get("name", "Team leader"), "action": "Team replaced PPT" if previous else "Team uploaded PPT", "registration_id": str(item["_id"]), "detail": f"Version {version}: {original}", "timestamp": now})
+        storage_upload(orig_key, content, content_type)
+    except RuntimeError as error:
+        raise HTTPException(502, "Storage could not store the presentation.") from error
+
+    # --- Generate + upload preview PDF ---
+    prev_key: Optional[str] = None
+    if extension == "pdf":
+        # For PDF uploads: preview = same file, but upload separately as preview
+        prev_key = preview_key(reference_id, version)
+        try:
+            storage_upload(prev_key, content, "application/pdf")
+        except RuntimeError:
+            prev_key = None  # Non-fatal
+    else:
+        # For PPT/PPTX: attempt LibreOffice conversion
+        pdf_bytes = convert_to_pdf_if_needed(content, extension)
+        if pdf_bytes:
+            prev_key = preview_key(reference_id, version)
+            try:
+                storage_upload(prev_key, pdf_bytes, "application/pdf")
+            except RuntimeError:
+                prev_key = None  # Non-fatal
+
+    # --- Push previous into history ---
+    if previous:
+        history.append(previous)
+
+    # --- Build new current document ---
+    current = {
+        "version": version,
+        "storage": {
+            "provider": "supabase",
+            "bucket": SUPABASE_BUCKET,
+            "original_key": orig_key,
+            "preview_key": prev_key,
+        },
+        "original_filename": original_filename,
+        "content_type": content_type,
+        "size": len(content),
+        "sha256": checksum,
+        "uploaded_at": now,
+        "uploaded_by": item.get("leader", {}).get("email"),
+        "status": "PPT Submitted",
+        "reviewer_remarks": "",
+        "internal_notes": "",
+        "last_modified": now,
+    }
+
+    await registration_collection.update_one(
+        {"_id": item["_id"]},
+        {
+            "$set": {
+                "ppt": {"current": current, "history": history},
+                "status": "PPT Submitted",
+                "updated_at": now,
+            }
+        },
+    )
+
+    action = "Team replaced PPT" if previous else "Team uploaded PPT"
+    await audit_collection.insert_one({
+        "admin_id": "team",
+        "admin_name": item.get("leader", {}).get("name", "Team leader"),
+        "action": action,
+        "registration_id": str(item["_id"]),
+        "detail": f"Version {version}: {original_filename}",
+        "timestamp": now,
+    })
+
     summary = team_summary(item)
-    await log_email(summary["leader_email"], "PPT Submission Received", f"Hello {summary['leader_name']},\n\nPPT Submission Received\nTeam: {summary['team_name']}\nReference ID: {summary['reference_id']}\nUpload time: {now:%d %b %Y, %I:%M %p UTC}\nStatus: PPT Submitted\n\nThe file can be replaced before the submission deadline.\n{PORTAL_URL}/ppt-submission")
-    return {"success": True, "file_name": current["file_name"], "version": version, "uploaded_at": now, "status": "PPT Submitted"}
+    await log_email(
+        summary["leader_email"],
+        "PPT Submission Received",
+        (
+            f"Hello {summary['leader_name']},\n\n"
+            f"PPT Submission Received\n"
+            f"Team: {summary['team_name']}\n"
+            f"Reference ID: {summary['reference_id']}\n"
+            f"Upload time: {now:%d %b %Y, %I:%M %p UTC}\n"
+            f"Status: PPT Submitted\n\n"
+            f"The file can be replaced before the submission deadline.\n"
+            f"{PORTAL_URL}/ppt-submission"
+        ),
+    )
+
+    return {
+        "success": True,
+        "version": version,
+        "original_filename": original_filename,
+        "has_preview": prev_key is not None,
+        "uploaded_at": now,
+        "status": "PPT Submitted",
+    }
