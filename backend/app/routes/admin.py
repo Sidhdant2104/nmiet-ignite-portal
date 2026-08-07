@@ -7,6 +7,7 @@ environment configuration or written to the database.
 from datetime import datetime, timedelta, timezone
 from typing import Literal, Optional
 import os
+import re
 
 import bcrypt
 import jwt
@@ -24,6 +25,7 @@ from copy import deepcopy
 from app.mongodb import admin_users_collection, announcement_collection, audit_collection, registration_collection, settings_collection
 from app.routes.ppt import STATUS as PPT_STATUSES, log_email
 from app.services.storage import create_signed_download, create_signed_preview, download_file as storage_download
+from zipfile import ZIP_DEFLATED, ZipFile
 
 router = APIRouter(prefix="/admin", tags=["Administration"])
 Role = Literal["super_admin", "faculty", "student_spoc", "student_coordinator"]
@@ -140,10 +142,56 @@ def serialize(item: dict):
     safe = deepcopy(item); safe["_id"] = str(safe["_id"])
     for upload in safe.get("ppt", {}).get("history", []):
         upload.pop("storage_key", None)
+        upload.get("storage", {}).pop("original_key", None)
+        upload.get("storage", {}).pop("preview_key", None)
     current = safe.get("ppt", {}).get("current")
     if current:
         current.pop("storage_key", None)
+        current.get("storage", {}).pop("original_key", None)
+        current.get("storage", {}).pop("preview_key", None)
     return safe
+
+def ppt_original_key(upload: dict) -> Optional[str]:
+    """Read both the legacy and current private-storage document shapes."""
+    return upload.get("storage_key") or upload.get("storage", {}).get("original_key")
+
+def ppt_preview_key(upload: dict) -> Optional[str]:
+    return upload.get("preview_key") or upload.get("storage", {}).get("preview_key") or (
+        ppt_original_key(upload) if upload.get("format") == "pdf" or str(upload.get("original_filename") or upload.get("file_name") or "").lower().endswith(".pdf") else None
+    )
+
+def upload_filename(upload: dict) -> str:
+    return upload.get("original_filename") or upload.get("file_name") or "presentation"
+
+def zip_name(value: str, fallback: str) -> str:
+    cleaned = re.sub(r"[^A-Za-z0-9._ -]+", "_", value or "").strip(" .")
+    return cleaned or fallback
+
+async def stream_ppt_zip(items: list[dict], filename: str, user: dict, root: Optional[str] = None):
+    """Build an admin-only archive from private storage without leaking object keys."""
+    output = BytesIO()
+    try:
+        with ZipFile(output, "w", ZIP_DEFLATED) as archive:
+            for item in items:
+                current = item.get("ppt", {}).get("current") or {}
+                key = ppt_original_key(current)
+                if not key:
+                    continue
+                try:
+                    content = storage_download(key)
+                except RuntimeError:
+                    # One unavailable object should not prevent recovery of every other submission.
+                    continue
+                team = zip_name(item.get("team", {}).get("teamName", ""), "Untitled Team")
+                theme = zip_name(item.get("team", {}).get("theme", ""), "Unassigned")
+                name = zip_name(upload_filename(current), "presentation")
+                prefix = f"{root}/" if root else ""
+                archive.writestr(f"{prefix}{theme}/{team}/{name}", content)
+    except RuntimeError as error:
+        raise HTTPException(502, "Unable to retrieve presentation. Please try again.") from error
+    output.seek(0)
+    await audit(user, "Downloaded PPT ZIP", detail=filename)
+    return StreamingResponse(output, media_type="application/zip", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
 def registration_query(search: Optional[str] = None, status: Optional[str] = None, theme: Optional[str] = None, category: Optional[str] = None, date_from: Optional[datetime] = None, date_to: Optional[datetime] = None, include_deleted: bool = False):
     query = {} if include_deleted else {"isDeleted": {"$ne": True}}
@@ -161,6 +209,9 @@ def registration_query(search: Optional[str] = None, status: Optional[str] = Non
             {"leader.name": {"$regex": search, "$options": "i"}},
             {"leader.email": {"$regex": search, "$options": "i"}},
             {"team.psId": {"$regex": search, "$options": "i"}},
+            {"registration_id": {"$regex": search, "$options": "i"}},
+            {"leader.college": {"$regex": search, "$options": "i"}},
+            {"team.college": {"$regex": search, "$options": "i"}},
         ]
     return query
 
@@ -363,13 +414,57 @@ async def ppt_submissions(user=Depends(require("view_ppt"))):
     async for item in registration_collection.find(ppt_scope(user)).sort("ppt.current.uploaded_at", -1): results.append(serialize(item))
     return {"data": results}
 
+@router.get("/ppt/themes")
+async def ppt_themes(user=Depends(require("view_ppt"))):
+    """Metadata-only theme summary; files are fetched only on review/download."""
+    groups: dict[str, dict] = {}
+    async for item in registration_collection.find(ppt_scope(user)):
+        theme = item.get("team", {}).get("theme") or "Unassigned"
+        group = groups.setdefault(theme, {"theme": theme, "total_teams": 0, "ppt_submitted": 0, "pending_review": 0, "approved": 0, "revision_requested": 0, "rejected": 0})
+        group["total_teams"] += 1
+        upload = item.get("ppt", {}).get("current")
+        if not upload:
+            continue
+        group["ppt_submitted"] += 1
+        status = upload.get("status", "PPT Submitted")
+        if status in {"PPT Submitted", "Under Review"}: group["pending_review"] += 1
+        elif status == "Approved": group["approved"] += 1
+        elif status == "Revision Requested": group["revision_requested"] += 1
+        elif status == "Rejected": group["rejected"] += 1
+    return {"data": sorted(groups.values(), key=lambda value: value["theme"].lower())}
+
+@router.get("/ppt/themes/{theme}/download")
+async def download_theme_ppts(theme: str, user=Depends(require("download_ppt"))):
+    items = []
+    theme_query = {"$or": [{"team.theme": {"$exists": False}}, {"team.theme": ""}, {"team.theme": None}]} if theme == "Unassigned" else {"team.theme": theme}
+    query = {**ppt_scope(user), **theme_query, "ppt.current": {"$exists": True}}
+    async for item in registration_collection.find(query):
+        if ppt_original_key(item.get("ppt", {}).get("current") or {}): items.append(item)
+    return await stream_ppt_zip(items, f"{zip_name(theme, 'Unassigned')}.zip", user)
+
+@router.get("/ppt/download-all")
+async def download_all_ppts(user=Depends(require("download_ppt"))):
+    items = []
+    query = {**ppt_scope(user), "ppt.current": {"$exists": True}}
+    async for item in registration_collection.find(query):
+        if ppt_original_key(item.get("ppt", {}).get("current") or {}): items.append(item)
+    return await stream_ppt_zip(items, "NMIET_SIH_2026_PPT_SUBMISSIONS.zip", user, "NMIET_SIH_2026_PPT_SUBMISSIONS")
+
 async def _ppt_file(registration_id: str, user: dict):
     try: object_id = ObjectId(registration_id)
     except Exception: raise HTTPException(400, "Invalid registration ID.")
     item = await registration_collection.find_one({"_id": object_id, **ppt_scope(user)})
     current = item.get("ppt", {}).get("current") if item else None
-    if not current or not current.get("storage_key"): raise HTTPException(404, "PPT submission not found or not permitted.")
+    if not current or not ppt_original_key(current): raise HTTPException(404, "PPT submission not found or not permitted.")
     return item, current
+
+def ppt_version(item: dict, version: Optional[int]) -> dict:
+    if version is None:
+        return item.get("ppt", {}).get("current") or {}
+    for upload in [item.get("ppt", {}).get("current") or {}, *item.get("ppt", {}).get("history", [])]:
+        if upload.get("version") == version:
+            return upload
+    raise HTTPException(404, "PPT version not found.")
 
 @router.get("/ppt/submissions/{registration_id}")
 @router.get("/ppt/{registration_id}")
@@ -378,10 +473,11 @@ async def ppt_submission(registration_id: str, user=Depends(require("view_ppt"))
     return serialize(item)
 
 @router.get("/ppt/{registration_id}/download")
-async def ppt_download(registration_id: str, user=Depends(require("download_ppt"))):
-    _, current = await _ppt_file(registration_id, user)
+async def ppt_download(registration_id: str, version: Optional[int] = None, user=Depends(require("download_ppt"))):
+    item, _ = await _ppt_file(registration_id, user)
+    current = ppt_version(item, version)
     try:
-        signed_url = create_signed_download(current["storage_key"], expires_in=60)
+        signed_url = create_signed_download(ppt_original_key(current), expires_in=60)
     except RuntimeError as error:
         raise HTTPException(502, "Storage could not generate a download link.") from error
     await audit(user, "Faculty downloaded PPT", registration_id, f"Version {current.get('version')}: {current.get('file_name')}")
@@ -389,11 +485,13 @@ async def ppt_download(registration_id: str, user=Depends(require("download_ppt"
     return RedirectResponse(url=signed_url, status_code=302)
 
 @router.get("/ppt/{registration_id}/preview")
-async def ppt_preview(registration_id: str, user=Depends(require("download_ppt"))):
-    _, current = await _ppt_file(registration_id, user)
-    if current.get("format") != "pdf": raise HTTPException(422, "Preview is available for PDF uploads. Download PPT/PPTX to review it.")
+async def ppt_preview(registration_id: str, version: Optional[int] = None, user=Depends(require("download_ppt"))):
+    item, _ = await _ppt_file(registration_id, user)
+    current = ppt_version(item, version)
+    key = ppt_preview_key(current)
+    if not key: raise HTTPException(422, "Preview unavailable. Download the original presentation instead.")
     try:
-        signed_url = create_signed_preview(current["storage_key"], expires_in=60)
+        signed_url = create_signed_preview(key, expires_in=60)
     except RuntimeError as error:
         raise HTTPException(502, "Storage could not generate a preview link.") from error
     await audit(user, "Previewed PPT", registration_id, f"Version {current.get('version')}: {current.get('file_name')}")

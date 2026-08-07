@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from app.schemas.update_registration import UpdateRegistration
 from app.schemas.registration import Registration
 from app.services.registration_service import registration_service
@@ -18,6 +18,9 @@ async def registration_status():
 
 @router.post("/")
 async def create_registration(registration: Registration):
+    control = await settings_collection.find_one({"key": "registration_control"})
+    if control and not control.get("is_open", True):
+        raise HTTPException(status_code=403, detail="Registrations are currently closed.")
 
     registration_dict = registration.model_dump()
 
