@@ -9,7 +9,7 @@ export type PptFile = {version:number;filename?:string;original_filename?:string
 export type PptRegistration = AdminRegistration & {ppt?:{current?:PptFile;history?:PptFile[]}};
 export type PptThemeSummary = {theme:string; total_teams:number; ppt_submitted:number; pending_review:number; approved:number; revision_requested:number; rejected:number};
 export type AuditEntry = { _id: string; admin_name: string; action: string; registration_id?: string; detail?: string; timestamp: string };
-export type AdminAnnouncement = { _id: string; title: string; body: string; is_pinned?: boolean; is_published?: boolean; scheduled_for?: string; expires_at?: string };
+export type AdminAnnouncement = { _id: string; title: string; body: string; tag?: string; is_pinned?: boolean; is_published?: boolean; is_archived?: boolean; scheduled_for?: string; expires_at?: string };
 export type ManagedAdmin = { _id:string; name:string; email:string; role:string; is_active:boolean; created_at?:string };
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> { const response = await fetch(`${API_URL}/admin${path}`, { credentials: "include", headers: { "Content-Type": "application/json", ...options.headers }, ...options }); if (!response.ok) { const body = await response.json().catch(() => ({})); throw new Error(body.detail || "The request could not be completed."); } return response.status === 204 ? undefined as T : response.json() as Promise<T>; }

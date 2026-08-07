@@ -53,6 +53,7 @@ class RegistrationPatch(BaseModel):
 class AnnouncementPayload(BaseModel):
     title: str = Field(min_length=3, max_length=140)
     body: str = Field(min_length=1, max_length=5000)
+    tag: str = Field(default="Update", min_length=1, max_length=48)
     is_pinned: bool = False
     is_published: bool = True
     scheduled_for: Optional[datetime] = None
@@ -569,20 +570,28 @@ async def get_announcements(user=Depends(current_admin)):
 
 @router.post("/announcements", dependencies=[Depends(csrf_guard)])
 async def create_announcement(payload: AnnouncementPayload, user=Depends(require("manage_announcements"))):
-    item=payload.model_dump(); item.update({"created_at": datetime.now(timezone.utc), "created_by": user["_id"]})
+    item=payload.model_dump(); item.update({"created_at": datetime.now(timezone.utc), "created_by": user["_id"], "is_archived": False})
     result=await announcement_collection.insert_one(item); await audit(user, "Created announcement", detail=item["title"])
     return {"id": str(result.inserted_id)}
 
 @router.patch("/announcements/{announcement_id}", dependencies=[Depends(csrf_guard)])
 async def update_announcement(announcement_id: str, payload: AnnouncementPayload, user=Depends(require("manage_announcements"))):
-    result = await announcement_collection.update_one({"_id": ObjectId(announcement_id)}, {"$set": payload.model_dump()})
+    try:
+        object_id = ObjectId(announcement_id)
+    except Exception:
+        raise HTTPException(400, "Invalid announcement ID.")
+    result = await announcement_collection.update_one({"_id": object_id}, {"$set": {**payload.model_dump(), "updated_at": datetime.now(timezone.utc), "updated_by": user["_id"]}})
     if not result.matched_count: raise HTTPException(404, "Announcement not found.")
     await audit(user, "Updated announcement", announcement_id, payload.title)
     return {"success": True}
 
 @router.delete("/announcements/{announcement_id}", dependencies=[Depends(csrf_guard)])
 async def delete_announcement(announcement_id: str, user=Depends(require("manage_announcements"))):
-    result = await announcement_collection.delete_one({"_id": ObjectId(announcement_id)})
-    if not result.deleted_count: raise HTTPException(404, "Announcement not found.")
-    await audit(user, "Deleted announcement", announcement_id)
+    try:
+        object_id = ObjectId(announcement_id)
+    except Exception:
+        raise HTTPException(400, "Invalid announcement ID.")
+    result = await announcement_collection.update_one({"_id": object_id, "is_archived": {"$ne": True}}, {"$set": {"is_archived": True, "archived_at": datetime.now(timezone.utc), "archived_by": user["_id"]}})
+    if not result.matched_count: raise HTTPException(404, "Announcement not found.")
+    await audit(user, "Archived announcement", announcement_id)
     return {"success": True}

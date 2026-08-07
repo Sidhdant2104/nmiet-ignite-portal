@@ -143,34 +143,3 @@ export const themes: Theme[] = [
 
 /** Empty until SIH officially releases the statements. */
 export const problemStatements: ProblemStatement[] = [];
-
-export const announcements: Announcement[] = [
-  {
-    id: "a1",
-    date: "2026-07-28",
-    tag: "Registration",
-    title: "Internal SIH 2026 registrations are open",
-    body: "Form your team of 6 (at least one female member) and submit your internal entry on this portal.",
-  },
-  {
-    id: "a2",
-    date: "2026-07-30",
-    tag: "Problem statements",
-    title: "Problem statements awaiting official release",
-    body: "SIH has not published the 2026 problem statements yet. They will appear on this portal automatically.",
-  },
-  {
-    id: "a3",
-    date: "2026-08-01",
-    tag: "Selection",
-    title: "45 teams will be shortlisted, 5 waitlisted",
-    body: "The internal jury shortlists 45 teams for official SIH nomination with 5 teams on standby.",
-  },
-  {
-  id: "a4",
-  date: "2026-08-05",
-  tag: "Mentors",
-  title: "Faculty mentor support available",
-  body: "Faculty mentors are optional during internal registration. Teams that wish to have a mentor but haven't found one yet can request assistance from the NMIET Innovation Cell.",
-},
-];
