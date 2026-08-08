@@ -200,10 +200,14 @@ const downloads = [
   {
     title: "NMIET SIH 2026 Guidelines",
     meta: "PDF",
+    href: "/resources/NMIET_SIH_2026_Guidebook.pdf",
+    filename: "NMIET_SIH_2026_Guidebook.pdf",
   },
   {
     title: "Idea Presentation Template",
     meta: "PPTX",
+    href: "/resources/NMIET_SIH_2026_PPT_Template.pptx",
+    filename: "NMIET_SIH_2026_PPT_Template.pptx",
   },
   {
     title: "Team Formation Checklist",
@@ -436,7 +440,7 @@ function GuidelinesPage() {
           <Block id="downloads" icon={Download} title="Downloads">
             <div className="grid gap-3 sm:grid-cols-2">
               {downloads.map((d) => (
-                <DownloadCard key={d.title} title={d.title} meta={d.meta} />
+                <DownloadCard key={d.title} {...d} />
               ))}
             </div>
           </Block>
@@ -448,8 +452,9 @@ function GuidelinesPage() {
   );
 }
 
-function DownloadCard({ title, meta }: { title: string; meta: string }) {
+function DownloadCard({ title, meta, href, filename }: { title: string; meta: string; href?: string; filename?: string }) {
   const [clicked, setClicked] = useState(false);
+  if (href) return <a href={href} download={filename} className="hover-lift flex items-center gap-4 rounded-3xl border border-border bg-card p-5 text-left shadow-soft"><span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-accent text-brand-blue"><Download className="h-5 w-5" aria-hidden /></span><span className="min-w-0"><span className="block truncate font-semibold">{title}</span><span className="block text-xs text-muted-foreground">{meta}</span></span></a>;
   return (
     <button
       type="button"
