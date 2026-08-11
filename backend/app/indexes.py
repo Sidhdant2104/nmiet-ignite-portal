@@ -1,7 +1,13 @@
-from app.mongodb import announcement_collection, registration_collection
+from app.mongodb import announcement_collection, registration_collection, evaluation_track_collection, judge_collection, track_coordinator_collection, presentation_queue_collection, evaluation_collection
 
 
 async def create_indexes():
+    await evaluation_track_collection.create_index("code", unique=True)
+    await evaluation_track_collection.create_index("track_id", unique=True)
+    await judge_collection.create_index([("name", 1), ("track_id", 1)], unique=True)
+    await track_coordinator_collection.create_index([("name", 1), ("track_id", 1)], unique=True)
+    await presentation_queue_collection.create_index("track_id", unique=True)
+    await evaluation_collection.create_index([("judge_id", 1), ("registration_id", 1)], unique=True)
     await registration_collection.create_index(
         "leader.email",
         unique=True,

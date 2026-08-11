@@ -13,6 +13,7 @@ from app.routes.theme import router as theme_router
 from app.routes.admin import router as admin_router
 from app.routes.ppt import router as ppt_router
 from app.routes.announcements import router as announcements_router
+from app.routes.evaluation import admin as evaluation_admin_router, judge as judge_router, coordinator as coordinator_router
 
 @asynccontextmanager
 
@@ -59,6 +60,9 @@ app.include_router(theme_router)
 app.include_router(admin_router)
 app.include_router(ppt_router)
 app.include_router(announcements_router)
+app.include_router(evaluation_admin_router)
+app.include_router(judge_router)
+app.include_router(coordinator_router)
 @app.get("/")
 async def root():
 
