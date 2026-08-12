@@ -32,9 +32,9 @@ Role = Literal["super_admin", "faculty", "student_spoc", "student_coordinator"]
 COOKIE_NAME = "nmiet_admin_session"
 
 ROLE_PERMISSIONS = {
-    "super_admin": {"manage_registrations", "delete_registrations", "manage_announcements", "send_email", "manage_users", "export", "view_dashboard", "view_activity", "view_ppt", "review_ppt", "download_ppt"},
-    "faculty": {"manage_registrations", "export", "view_dashboard", "view_ppt", "review_ppt", "download_ppt"},
-    "student_spoc": {"manage_registrations", "view_dashboard", "export", "view_ppt"},
+    "super_admin": {"manage_registrations", "delete_registrations", "manage_announcements", "send_email", "manage_users", "export", "view_dashboard", "view_activity", "view_ppt", "review_ppt", "download_ppt", "manage_evaluation"},
+    "faculty": {"manage_registrations", "export", "view_dashboard", "view_ppt", "review_ppt", "download_ppt", "manage_evaluation"},
+    "student_spoc": {"manage_registrations", "view_dashboard", "export", "view_ppt", "manage_evaluation"},
     "student_coordinator": {"view_dashboard", "view_ppt"},
 }
 

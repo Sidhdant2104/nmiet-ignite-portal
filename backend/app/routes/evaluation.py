@@ -15,6 +15,7 @@ class AccountIn(BaseModel): name:str=Field(min_length=2); track_id:str; password
 class LoginIn(BaseModel): name:str; track_id:str; password:str
 class QueueIn(BaseModel): team_ids:list[str]
 class EvalIn(BaseModel): registration_id:str; scores:dict[str,float]
+class CriterionIn(BaseModel): name:str=Field(min_length=2); description:str=""; max_marks:int=Field(ge=1); order:int=0; is_active:bool=True
 def secret():
  if not ADMIN_JWT_SECRET or len(ADMIN_JWT_SECRET)<32: raise HTTPException(503,"Authentication is not configured.")
  return ADMIN_JWT_SECRET
@@ -65,6 +66,11 @@ async def create_judge(x:AccountIn,user=Depends(require("manage_evaluation"))): 
 async def get_coordinators(user=Depends(require("manage_evaluation"))): return {"data":await account_list(coordinators)}
 @admin.post("/coordinators",dependencies=[Depends(csrf_guard)])
 async def create_coordinator(x:AccountIn,user=Depends(require("manage_evaluation"))): return await make_account(x,coordinators,"COORD-","track_student_coordinator")
+@admin.get("/criteria")
+async def get_criteria(user=Depends(require("manage_evaluation"))): return {"data":[{**c,"_id":str(c["_id"])} async for c in criteria.find().sort("order",1)]}
+@admin.post("/criteria",dependencies=[Depends(csrf_guard)])
+async def create_criterion(x:CriterionIn,user=Depends(require("manage_evaluation"))):
+ d=x.model_dump();d.update({"id":"CRIT-"+uuid.uuid4().hex[:8].upper(),"created_at":datetime.now(timezone.utc)});r=await criteria.insert_one(d);return {"id":str(r.inserted_id)}
 @judge.get("/tracks")
 @coordinator.get("/tracks")
 async def public_tracks(): return {"data":[{"track_id":x["track_id"],"name":x["name"]} for x in await active_tracks()]}

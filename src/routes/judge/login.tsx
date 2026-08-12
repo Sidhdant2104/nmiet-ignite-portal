@@ -1,0 +1,1 @@
+import {createFileRoute} from "@tanstack/react-router";import {Login} from "@/components/evaluation-portals";export const Route=createFileRoute("/judge/login")({component:()=> <Login role="judge"/>});

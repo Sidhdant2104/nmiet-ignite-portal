@@ -24,6 +24,7 @@ import { Route as AdminActivityRouteImport } from './routes/admin/activity'
 import { Route as AdminAnnouncementsRouteImport } from './routes/admin/announcements'
 import { Route as AdminDashboardRouteImport } from './routes/admin/dashboard'
 import { Route as AdminEmailRouteImport } from './routes/admin/email'
+import { Route as AdminEvaluationRouteImport } from './routes/admin/evaluation'
 import { Route as AdminLoginRouteImport } from './routes/admin/login'
 import { Route as AdminPptRouteImport } from './routes/admin/ppt'
 import { Route as AdminRegistrationsRouteImport } from './routes/admin/registrations'
@@ -31,6 +32,14 @@ import { Route as AdminUsersRouteImport } from './routes/admin/users'
 import { Route as ApiProblemStatementsRouteImport } from './routes/api/problem-statements'
 import { Route as ApiRegisterRouteImport } from './routes/api/register'
 import { Route as ApiThemesRouteImport } from './routes/api/themes'
+import { Route as JudgeEvaluationRouteImport } from './routes/judge/evaluation'
+import { Route as JudgeLoginRouteImport } from './routes/judge/login'
+import { Route as TrackLoginRouteImport } from './routes/track/login'
+import { Route as TrackQueueRouteImport } from './routes/track/queue'
+import { Route as AdminEvaluationCoordinatorsRouteImport } from './routes/admin/evaluation/coordinators'
+import { Route as AdminEvaluationCriteriaRouteImport } from './routes/admin/evaluation/criteria'
+import { Route as AdminEvaluationJudgesRouteImport } from './routes/admin/evaluation/judges'
+import { Route as AdminEvaluationTracksRouteImport } from './routes/admin/evaluation/tracks'
 import { Route as AdminPptIdRouteImport } from './routes/admin/ppt/$id'
 import { Route as AdminRegistrationsIdRouteImport } from './routes/admin/registrations/$id'
 
@@ -109,6 +118,11 @@ const AdminEmailRoute = AdminEmailRouteImport.update({
   path: '/admin/email',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminEvaluationRoute = AdminEvaluationRouteImport.update({
+  id: '/admin/evaluation',
+  path: '/admin/evaluation',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminLoginRoute = AdminLoginRouteImport.update({
   id: '/admin/login',
   path: '/admin/login',
@@ -144,6 +158,47 @@ const ApiThemesRoute = ApiThemesRouteImport.update({
   path: '/api/themes',
   getParentRoute: () => rootRouteImport,
 } as any)
+const JudgeEvaluationRoute = JudgeEvaluationRouteImport.update({
+  id: '/judge/evaluation',
+  path: '/judge/evaluation',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const JudgeLoginRoute = JudgeLoginRouteImport.update({
+  id: '/judge/login',
+  path: '/judge/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TrackLoginRoute = TrackLoginRouteImport.update({
+  id: '/track/login',
+  path: '/track/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TrackQueueRoute = TrackQueueRouteImport.update({
+  id: '/track/queue',
+  path: '/track/queue',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminEvaluationCoordinatorsRoute =
+  AdminEvaluationCoordinatorsRouteImport.update({
+    id: '/coordinators',
+    path: '/coordinators',
+    getParentRoute: () => AdminEvaluationRoute,
+  } as any)
+const AdminEvaluationCriteriaRoute = AdminEvaluationCriteriaRouteImport.update({
+  id: '/criteria',
+  path: '/criteria',
+  getParentRoute: () => AdminEvaluationRoute,
+} as any)
+const AdminEvaluationJudgesRoute = AdminEvaluationJudgesRouteImport.update({
+  id: '/judges',
+  path: '/judges',
+  getParentRoute: () => AdminEvaluationRoute,
+} as any)
+const AdminEvaluationTracksRoute = AdminEvaluationTracksRouteImport.update({
+  id: '/tracks',
+  path: '/tracks',
+  getParentRoute: () => AdminEvaluationRoute,
+} as any)
 const AdminPptIdRoute = AdminPptIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -170,6 +225,7 @@ export interface FileRoutesByFullPath {
   '/admin/announcements': typeof AdminAnnouncementsRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/email': typeof AdminEmailRoute
+  '/admin/evaluation': typeof AdminEvaluationRouteWithChildren
   '/admin/login': typeof AdminLoginRoute
   '/admin/ppt': typeof AdminPptRouteWithChildren
   '/admin/registrations': typeof AdminRegistrationsRouteWithChildren
@@ -177,7 +233,15 @@ export interface FileRoutesByFullPath {
   '/api/problem-statements': typeof ApiProblemStatementsRoute
   '/api/register': typeof ApiRegisterRoute
   '/api/themes': typeof ApiThemesRoute
+  '/judge/evaluation': typeof JudgeEvaluationRoute
+  '/judge/login': typeof JudgeLoginRoute
+  '/track/login': typeof TrackLoginRoute
+  '/track/queue': typeof TrackQueueRoute
   '/admin/': typeof AdminIndexRoute
+  '/admin/evaluation/coordinators': typeof AdminEvaluationCoordinatorsRoute
+  '/admin/evaluation/criteria': typeof AdminEvaluationCriteriaRoute
+  '/admin/evaluation/judges': typeof AdminEvaluationJudgesRoute
+  '/admin/evaluation/tracks': typeof AdminEvaluationTracksRoute
   '/admin/ppt/$id': typeof AdminPptIdRoute
   '/admin/registrations/$id': typeof AdminRegistrationsIdRoute
 }
@@ -196,6 +260,7 @@ export interface FileRoutesByTo {
   '/admin/announcements': typeof AdminAnnouncementsRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/email': typeof AdminEmailRoute
+  '/admin/evaluation': typeof AdminEvaluationRouteWithChildren
   '/admin/login': typeof AdminLoginRoute
   '/admin/ppt': typeof AdminPptRouteWithChildren
   '/admin/registrations': typeof AdminRegistrationsRouteWithChildren
@@ -203,7 +268,15 @@ export interface FileRoutesByTo {
   '/api/problem-statements': typeof ApiProblemStatementsRoute
   '/api/register': typeof ApiRegisterRoute
   '/api/themes': typeof ApiThemesRoute
+  '/judge/evaluation': typeof JudgeEvaluationRoute
+  '/judge/login': typeof JudgeLoginRoute
+  '/track/login': typeof TrackLoginRoute
+  '/track/queue': typeof TrackQueueRoute
   '/admin': typeof AdminIndexRoute
+  '/admin/evaluation/coordinators': typeof AdminEvaluationCoordinatorsRoute
+  '/admin/evaluation/criteria': typeof AdminEvaluationCriteriaRoute
+  '/admin/evaluation/judges': typeof AdminEvaluationJudgesRoute
+  '/admin/evaluation/tracks': typeof AdminEvaluationTracksRoute
   '/admin/ppt/$id': typeof AdminPptIdRoute
   '/admin/registrations/$id': typeof AdminRegistrationsIdRoute
 }
@@ -223,6 +296,7 @@ export interface FileRoutesById {
   '/admin/announcements': typeof AdminAnnouncementsRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/email': typeof AdminEmailRoute
+  '/admin/evaluation': typeof AdminEvaluationRouteWithChildren
   '/admin/login': typeof AdminLoginRoute
   '/admin/ppt': typeof AdminPptRouteWithChildren
   '/admin/registrations': typeof AdminRegistrationsRouteWithChildren
@@ -230,7 +304,15 @@ export interface FileRoutesById {
   '/api/problem-statements': typeof ApiProblemStatementsRoute
   '/api/register': typeof ApiRegisterRoute
   '/api/themes': typeof ApiThemesRoute
+  '/judge/evaluation': typeof JudgeEvaluationRoute
+  '/judge/login': typeof JudgeLoginRoute
+  '/track/login': typeof TrackLoginRoute
+  '/track/queue': typeof TrackQueueRoute
   '/admin/': typeof AdminIndexRoute
+  '/admin/evaluation/coordinators': typeof AdminEvaluationCoordinatorsRoute
+  '/admin/evaluation/criteria': typeof AdminEvaluationCriteriaRoute
+  '/admin/evaluation/judges': typeof AdminEvaluationJudgesRoute
+  '/admin/evaluation/tracks': typeof AdminEvaluationTracksRoute
   '/admin/ppt/$id': typeof AdminPptIdRoute
   '/admin/registrations/$id': typeof AdminRegistrationsIdRoute
 }
@@ -251,6 +333,7 @@ export interface FileRouteTypes {
     | '/admin/announcements'
     | '/admin/dashboard'
     | '/admin/email'
+    | '/admin/evaluation'
     | '/admin/login'
     | '/admin/ppt'
     | '/admin/registrations'
@@ -258,7 +341,15 @@ export interface FileRouteTypes {
     | '/api/problem-statements'
     | '/api/register'
     | '/api/themes'
+    | '/judge/evaluation'
+    | '/judge/login'
+    | '/track/login'
+    | '/track/queue'
     | '/admin/'
+    | '/admin/evaluation/coordinators'
+    | '/admin/evaluation/criteria'
+    | '/admin/evaluation/judges'
+    | '/admin/evaluation/tracks'
     | '/admin/ppt/$id'
     | '/admin/registrations/$id'
   fileRoutesByTo: FileRoutesByTo
@@ -277,6 +368,7 @@ export interface FileRouteTypes {
     | '/admin/announcements'
     | '/admin/dashboard'
     | '/admin/email'
+    | '/admin/evaluation'
     | '/admin/login'
     | '/admin/ppt'
     | '/admin/registrations'
@@ -284,7 +376,15 @@ export interface FileRouteTypes {
     | '/api/problem-statements'
     | '/api/register'
     | '/api/themes'
+    | '/judge/evaluation'
+    | '/judge/login'
+    | '/track/login'
+    | '/track/queue'
     | '/admin'
+    | '/admin/evaluation/coordinators'
+    | '/admin/evaluation/criteria'
+    | '/admin/evaluation/judges'
+    | '/admin/evaluation/tracks'
     | '/admin/ppt/$id'
     | '/admin/registrations/$id'
   id:
@@ -303,6 +403,7 @@ export interface FileRouteTypes {
     | '/admin/announcements'
     | '/admin/dashboard'
     | '/admin/email'
+    | '/admin/evaluation'
     | '/admin/login'
     | '/admin/ppt'
     | '/admin/registrations'
@@ -310,7 +411,15 @@ export interface FileRouteTypes {
     | '/api/problem-statements'
     | '/api/register'
     | '/api/themes'
+    | '/judge/evaluation'
+    | '/judge/login'
+    | '/track/login'
+    | '/track/queue'
     | '/admin/'
+    | '/admin/evaluation/coordinators'
+    | '/admin/evaluation/criteria'
+    | '/admin/evaluation/judges'
+    | '/admin/evaluation/tracks'
     | '/admin/ppt/$id'
     | '/admin/registrations/$id'
   fileRoutesById: FileRoutesById
@@ -330,6 +439,7 @@ export interface RootRouteChildren {
   AdminAnnouncementsRoute: typeof AdminAnnouncementsRoute
   AdminDashboardRoute: typeof AdminDashboardRoute
   AdminEmailRoute: typeof AdminEmailRoute
+  AdminEvaluationRoute: typeof AdminEvaluationRouteWithChildren
   AdminLoginRoute: typeof AdminLoginRoute
   AdminPptRoute: typeof AdminPptRouteWithChildren
   AdminRegistrationsRoute: typeof AdminRegistrationsRouteWithChildren
@@ -337,6 +447,10 @@ export interface RootRouteChildren {
   ApiProblemStatementsRoute: typeof ApiProblemStatementsRoute
   ApiRegisterRoute: typeof ApiRegisterRoute
   ApiThemesRoute: typeof ApiThemesRoute
+  JudgeEvaluationRoute: typeof JudgeEvaluationRoute
+  JudgeLoginRoute: typeof JudgeLoginRoute
+  TrackLoginRoute: typeof TrackLoginRoute
+  TrackQueueRoute: typeof TrackQueueRoute
   AdminIndexRoute: typeof AdminIndexRoute
 }
 
@@ -447,6 +561,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminEmailRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/evaluation': {
+      id: '/admin/evaluation'
+      path: '/admin/evaluation'
+      fullPath: '/admin/evaluation'
+      preLoaderRoute: typeof AdminEvaluationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/login': {
       id: '/admin/login'
       path: '/admin/login'
@@ -496,6 +617,62 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiThemesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/judge/evaluation': {
+      id: '/judge/evaluation'
+      path: '/judge/evaluation'
+      fullPath: '/judge/evaluation'
+      preLoaderRoute: typeof JudgeEvaluationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/judge/login': {
+      id: '/judge/login'
+      path: '/judge/login'
+      fullPath: '/judge/login'
+      preLoaderRoute: typeof JudgeLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/track/login': {
+      id: '/track/login'
+      path: '/track/login'
+      fullPath: '/track/login'
+      preLoaderRoute: typeof TrackLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/track/queue': {
+      id: '/track/queue'
+      path: '/track/queue'
+      fullPath: '/track/queue'
+      preLoaderRoute: typeof TrackQueueRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/evaluation/coordinators': {
+      id: '/admin/evaluation/coordinators'
+      path: '/coordinators'
+      fullPath: '/admin/evaluation/coordinators'
+      preLoaderRoute: typeof AdminEvaluationCoordinatorsRouteImport
+      parentRoute: typeof AdminEvaluationRoute
+    }
+    '/admin/evaluation/criteria': {
+      id: '/admin/evaluation/criteria'
+      path: '/criteria'
+      fullPath: '/admin/evaluation/criteria'
+      preLoaderRoute: typeof AdminEvaluationCriteriaRouteImport
+      parentRoute: typeof AdminEvaluationRoute
+    }
+    '/admin/evaluation/judges': {
+      id: '/admin/evaluation/judges'
+      path: '/judges'
+      fullPath: '/admin/evaluation/judges'
+      preLoaderRoute: typeof AdminEvaluationJudgesRouteImport
+      parentRoute: typeof AdminEvaluationRoute
+    }
+    '/admin/evaluation/tracks': {
+      id: '/admin/evaluation/tracks'
+      path: '/tracks'
+      fullPath: '/admin/evaluation/tracks'
+      preLoaderRoute: typeof AdminEvaluationTracksRouteImport
+      parentRoute: typeof AdminEvaluationRoute
+    }
     '/admin/ppt/$id': {
       id: '/admin/ppt/$id'
       path: '/$id'
@@ -512,6 +689,24 @@ declare module '@tanstack/react-router' {
     }
   }
 }
+
+interface AdminEvaluationRouteChildren {
+  AdminEvaluationCoordinatorsRoute: typeof AdminEvaluationCoordinatorsRoute
+  AdminEvaluationCriteriaRoute: typeof AdminEvaluationCriteriaRoute
+  AdminEvaluationJudgesRoute: typeof AdminEvaluationJudgesRoute
+  AdminEvaluationTracksRoute: typeof AdminEvaluationTracksRoute
+}
+
+const AdminEvaluationRouteChildren: AdminEvaluationRouteChildren = {
+  AdminEvaluationCoordinatorsRoute: AdminEvaluationCoordinatorsRoute,
+  AdminEvaluationCriteriaRoute: AdminEvaluationCriteriaRoute,
+  AdminEvaluationJudgesRoute: AdminEvaluationJudgesRoute,
+  AdminEvaluationTracksRoute: AdminEvaluationTracksRoute,
+}
+
+const AdminEvaluationRouteWithChildren = AdminEvaluationRoute._addFileChildren(
+  AdminEvaluationRouteChildren,
+)
 
 interface AdminPptRouteChildren {
   AdminPptIdRoute: typeof AdminPptIdRoute
@@ -551,6 +746,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminAnnouncementsRoute: AdminAnnouncementsRoute,
   AdminDashboardRoute: AdminDashboardRoute,
   AdminEmailRoute: AdminEmailRoute,
+  AdminEvaluationRoute: AdminEvaluationRouteWithChildren,
   AdminLoginRoute: AdminLoginRoute,
   AdminPptRoute: AdminPptRouteWithChildren,
   AdminRegistrationsRoute: AdminRegistrationsRouteWithChildren,
@@ -558,6 +754,10 @@ const rootRouteChildren: RootRouteChildren = {
   ApiProblemStatementsRoute: ApiProblemStatementsRoute,
   ApiRegisterRoute: ApiRegisterRoute,
   ApiThemesRoute: ApiThemesRoute,
+  JudgeEvaluationRoute: JudgeEvaluationRoute,
+  JudgeLoginRoute: JudgeLoginRoute,
+  TrackLoginRoute: TrackLoginRoute,
+  TrackQueueRoute: TrackQueueRoute,
   AdminIndexRoute: AdminIndexRoute,
 }
 export const routeTree = rootRouteImport

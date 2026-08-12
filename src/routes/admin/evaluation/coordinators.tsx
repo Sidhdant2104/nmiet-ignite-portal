@@ -1,0 +1,1 @@
+import {createFileRoute} from "@tanstack/react-router"; import {Coordinators} from "@/components/evaluation-admin"; export const Route=createFileRoute("/admin/evaluation/coordinators")({component:Coordinators});

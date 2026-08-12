@@ -1,12 +1,12 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bell, ClipboardList, FileText, LayoutDashboard, LogOut, Mail, Menu, Pencil, Search, ShieldCheck, Users, X } from "lucide-react";
+import { Bell, ClipboardList, FileText, LayoutDashboard, LogOut, Mail, Menu, Pencil, Search, ShieldCheck, Users, X, Scale } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { adminApi, statuses, type AdminAnnouncement, type AdminRegistration, type Status, type PptRegistration, type PptReviewStatus } from "@/lib/admin-api";
 import { Badge } from "@/components/ui/badge"; import { Button } from "@/components/ui/button"; import { Input } from "@/components/ui/input";
 
-const links = [["/admin/dashboard","Overview",LayoutDashboard],["/admin/users","Users",Users],["/admin/registrations","Registrations",Users],["/admin/ppt","PPT submissions",FileText],["/admin/announcements","Announcements",Bell],["/admin/email","Email centre",Mail],["/admin/activity","Activity log",ClipboardList]] as const;
+const links = [["/admin/dashboard","Overview",LayoutDashboard],["/admin/users","Users",Users],["/admin/registrations","Registrations",Users],["/admin/ppt","PPT submissions",FileText],["/admin/evaluation","Evaluation",Scale],["/admin/announcements","Announcements",Bell],["/admin/email","Email centre",Mail],["/admin/activity","Activity log",ClipboardList]] as const;
 const qk={dashboard:["admin","dashboard"], registrations:(filters?:object)=>["admin","registrations",filters] as const, activity:["admin","activity"], announcements:["admin","announcements"]} as const;
 function Loading(){return <div className="py-16 text-center text-sm text-muted-foreground">Loading workspace…</div>} function Failure({error,retry}:{error:Error;retry:()=>void}){return <div className="rounded-2xl border border-destructive/30 bg-card p-8 text-center"><p className="font-semibold">Couldn’t load this workspace</p><p className="mt-1 text-sm text-muted-foreground">{error.message}</p><Button className="mt-4" onClick={retry}>Retry</Button></div>} function Empty({children}:{children:string}){return <div className="py-14 text-center text-sm text-muted-foreground">{children}</div>}
 function Status({value="Registered"}:{value?:string}){const styles:Record<string,string>={Qualified:"bg-emerald-500/15 text-emerald-700",Shortlisted:"bg-blue-500/15 text-blue-700",Rejected:"bg-red-500/15 text-red-700","Under Review":"bg-amber-500/15 text-amber-700","PPT Submitted":"bg-violet-500/15 text-violet-700"};return <Badge className={`border-0 ${styles[value]||"bg-muted text-muted-foreground"}`}>{value}</Badge>}
