@@ -1,0 +1,6 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { EvaluationOverview } from "@/components/evaluation-admin";
+
+export const Route = createFileRoute("/admin/evaluation/")({
+  component: EvaluationOverview,
+});

@@ -135,7 +135,9 @@ async def make_account(x, coll, prefix, role):
         import traceback
         traceback.print_exc()
         raise HTTPException(500, f"Account creation failed: {str(e)}")
-async def get_judges(user=Depends(require("manage_evaluation"))): return {"data":await account_list(judges)}
+@admin.get("/judges")
+async def get_judges(user=Depends(require("manage_evaluation"))):
+    return {"data": await account_list(judges)}
 @admin.post("/judges",dependencies=[Depends(csrf_guard)])
 async def create_judge(x:AccountIn,user=Depends(require("manage_evaluation"))): return await make_account(x,judges,"JUDGE-","judge")
 async def update_account(account_id,x,coll):
@@ -155,9 +157,27 @@ async def create_coordinator(x:AccountIn,user=Depends(require("manage_evaluation
 async def update_coordinator(account_id:str,x:AccountUpdate,user=Depends(require("manage_evaluation"))): return await update_account(account_id,x,coordinators)
 @admin.get("/criteria")
 async def get_criteria(user=Depends(require("manage_evaluation"))): return {"data":[{**c,"_id":str(c["_id"])} async for c in criteria.find().sort("order",1)]}
-@admin.post("/criteria",dependencies=[Depends(csrf_guard)])
-async def create_criterion(x:CriterionIn,user=Depends(require("manage_evaluation"))):
- d=x.model_dump();d.update({"id":"CRIT-"+uuid.uuid4().hex[:8].upper(),"created_at":datetime.now(timezone.utc)});r=await criteria.insert_one(d);return {"id":str(r.inserted_id)}
+@admin.post("/criteria", dependencies=[Depends(csrf_guard)])
+async def create_criterion(
+    x: CriterionIn,
+    user=Depends(require("manage_evaluation"))
+):
+    d = x.model_dump()
+
+    criterion_id = "CRIT-" + uuid.uuid4().hex[:8].upper()
+
+    d.update({
+        "id": criterion_id,
+        "criterion_id": criterion_id,
+        "created_at": datetime.now(timezone.utc)
+    })
+
+    r = await criteria.insert_one(d)
+
+    return {
+        "id": str(r.inserted_id),
+        "criterion_id": criterion_id
+    }
 @admin.patch("/criteria/{criterion_id}",dependencies=[Depends(csrf_guard)])
 async def update_criterion(criterion_id:str,x:CriterionIn,user=Depends(require("manage_evaluation"))):
  r=await criteria.update_one({"id":criterion_id},{"$set":{**x.model_dump(),"updated_at":datetime.now(timezone.utc)}})
