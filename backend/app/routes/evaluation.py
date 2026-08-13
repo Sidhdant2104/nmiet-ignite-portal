@@ -12,7 +12,13 @@ from app.mongodb import evaluation_track_collection as tracks, judge_collection 
 from app.routes.admin import require, csrf_guard
 
 admin=APIRouter(prefix="/admin/evaluation",tags=["Evaluation"]); judge=APIRouter(prefix="/judge",tags=["Judge Evaluation"]); coordinator=APIRouter(prefix="/track",tags=["Track Queue"])
-class TrackIn(BaseModel): name:str=Field(min_length=2); code:str=Field(min_length=1); theme:str; domain:str; judges_required:int=Field(ge=1); is_active:bool=True
+class TrackIn(BaseModel):
+    name: str = Field(min_length=2)
+    code: str = Field(min_length=1)
+    theme: str = Field(min_length=2)
+    domain: str = Field(min_length=2)
+    judges_required: int = Field(ge=1)
+    is_active: bool = True
 class AccountIn(BaseModel): name:str=Field(min_length=2); track_id:str; password:str=Field(min_length=8); is_active:bool=True
 class AccountUpdate(BaseModel): name:Optional[str]=Field(None,min_length=2); track_id:Optional[str]=None; password:Optional[str]=Field(None,min_length=8); is_active:Optional[bool]=None
 class LoginIn(BaseModel): name:str; track_id:str; password:str
@@ -61,12 +67,74 @@ async def account_list(coll):
  async for x in coll.find().sort("created_at",-1):
   x["_id"]=str(x["_id"]);x.pop("password_hash",None);out.append(x)
  return out
-async def make_account(x,coll,prefix,role):
- if not await tracks.find_one({"track_id":x.track_id,"is_active":True}): raise HTTPException(404,"Track not found.")
- if coll is coordinators and await coordinators.find_one({"track_id":x.track_id}): raise HTTPException(409,"A coordinator is already assigned to this track.")
- if await coll.find_one({"name":x.name.strip(),"track_id":x.track_id}): raise HTTPException(409,"Name already exists in this track.")
- now=datetime.now(timezone.utc); doc={"id":prefix+uuid.uuid4().hex[:8].upper(),"name":x.name.strip(),"track_id":x.track_id,"role":role,"password_hash":bcrypt.hashpw(x.password.encode(),bcrypt.gensalt()).decode(),"is_active":x.is_active,"created_at":now,"updated_at":now}; r=await coll.insert_one(doc); return {"id":str(r.inserted_id),f"{role}_id":doc["id"]}
-@admin.get("/judges")
+async def make_account(x, coll, prefix, role):
+    try:
+        print("DEBUG: creating account:", x.model_dump())
+
+        track = await tracks.find_one({
+            "track_id": x.track_id,
+            "is_active": True
+        })
+        print("DEBUG: track:", track)
+
+        if not track:
+            raise HTTPException(404, "Track not found.")
+
+        if coll is coordinators and await coordinators.find_one({
+            "track_id": x.track_id
+        }):
+            raise HTTPException(
+                409,
+                "A coordinator is already assigned to this track."
+            )
+
+        if await coll.find_one({
+            "name": x.name.strip(),
+            "track_id": x.track_id
+        }):
+            raise HTTPException(409, "Name already exists in this track.")
+
+        now = datetime.now(timezone.utc)
+
+        password_hash = bcrypt.hashpw(
+            x.password.encode(),
+            bcrypt.gensalt()
+        ).decode()
+
+        account_id = prefix + uuid.uuid4().hex[:8].upper()
+
+        doc = {
+            "id": account_id,
+            "name": x.name.strip(),
+            "track_id": x.track_id,
+            "role": role,
+            "password_hash": password_hash,
+            "is_active": x.is_active,
+            "created_at": now,
+            "updated_at": now,
+        }
+
+        if role == "judge":
+            doc["judge_id"] = account_id
+       
+
+        print("DEBUG: inserting:", doc)
+
+        r = await coll.insert_one(doc)
+
+        print("DEBUG: inserted:", r.inserted_id)
+
+        return {
+            "id": str(r.inserted_id),
+            f"{role}_id": doc["id"]
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(500, f"Account creation failed: {str(e)}")
 async def get_judges(user=Depends(require("manage_evaluation"))): return {"data":await account_list(judges)}
 @admin.post("/judges",dependencies=[Depends(csrf_guard)])
 async def create_judge(x:AccountIn,user=Depends(require("manage_evaluation"))): return await make_account(x,judges,"JUDGE-","judge")
@@ -101,7 +169,19 @@ async def public_tracks(): return {"data":[{"track_id":x["track_id"],"name":x["n
 async def login(x,coll,cookie,response):
  d=await coll.find_one({"name":x.name.strip(),"track_id":x.track_id,"is_active":True})
  if not d or not bcrypt.checkpw(x.password.encode(),d["password_hash"].encode()): raise HTTPException(401,"Invalid credentials.")
- response.set_cookie(cookie,jwt.encode({"sub":str(d["_id"]),"exp":datetime.now(timezone.utc)+timedelta(hours=8)},secret(),algorithm="HS256"),httponly=True,samesite="lax",secure=os.getenv("ENVIRONMENT")=="production",path="/"); return {"success":True}
+ response.set_cookie(
+    cookie,
+    jwt.encode(
+        {"sub": str(d["_id"]),
+         "exp": datetime.now(timezone.utc) + timedelta(hours=8)},
+        secret(),
+        algorithm="HS256"
+    ),
+    httponly=True,
+    samesite="none",
+    secure=True,
+    path="/"
+); return {"success":True}
 @judge.post("/auth/login",dependencies=[Depends(csrf_guard)])
 async def judge_login(x:LoginIn,response:Response): return await login(x,judges,"judge_session",response)
 @coordinator.post("/auth/login",dependencies=[Depends(csrf_guard)])

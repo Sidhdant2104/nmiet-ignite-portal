@@ -123,10 +123,14 @@ async def csrf_guard(request: Request):
     """Require browser mutations to originate from the approved portal origins."""
     origin = request.headers.get("origin")
     allowed = {
-        "http://localhost:5173", "http://127.0.0.1:5173",
-        "http://localhost:8080", "http://127.0.0.1:8080",
-        "https://nmietsihportal.vercel.app",
-    }
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:8080",
+    "http://127.0.0.1:8080",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+    "https://nmietsihportal.vercel.app",
+}
     if origin and origin not in allowed:
         raise HTTPException(status_code=403, detail="Cross-site request blocked.")
 
