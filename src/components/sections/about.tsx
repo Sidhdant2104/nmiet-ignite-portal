@@ -71,14 +71,14 @@ export function AboutSection() {
     <section id="about" className="section-pad relative overflow-hidden">
       <div className="shell">
         <SectionHeading
-          eyebrow="About SIH"
+          eyebrow="About IIC NMIET"
           title={
             <>
-              India&apos;s largest open innovation model, and{" "}
-              <span className="text-gradient">NMIET&apos;s route into it</span>
+              Innovation at NMIET,{" "}
+              <span className="text-gradient">powered by IIC</span>
             </>
           }
-          description="Smart India Hackathon is a nationwide initiative where student teams solve pressing problems posted by ministries, PSUs and industry. NMIET runs an internal round first — the strongest teams go forward."
+          description="The Institution's Innovation Council (IIC) at NMIET promotes innovation, creativity and entrepreneurship among students through workshops, competitions, hackathons and other innovation-driven initiatives. As part of these efforts, IIC NMIET is facilitating the institute's internal selection for Smart India Hackathon 2026, giving student teams an opportunity to turn ideas into impactful solutions."
         />
 
         <div className="mt-16 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -89,13 +89,19 @@ export function AboutSection() {
                   {item.step}
                 </span>
                 <h3 className="mt-4 text-lg font-semibold">{item.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{item.body}</p>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                  {item.body}
+                </p>
                 <motion.div
                   aria-hidden
                   initial={{ scaleX: 0 }}
                   whileInView={{ scaleX: 1 }}
                   viewport={{ once: true }}
-                  transition={{ duration: 0.9, delay: 0.2 + i * 0.1, ease: [0.22, 1, 0.36, 1] }}
+                  transition={{
+                    duration: 0.9,
+                    delay: 0.2 + i * 0.1,
+                    ease: [0.22, 1, 0.36, 1],
+                  }}
                   className="absolute inset-x-6 bottom-5 h-px origin-left bg-gradient-to-r from-primary via-brand-blue to-transparent"
                 />
               </div>
@@ -117,7 +123,9 @@ export function AboutSection() {
                     <b.icon className="h-5 w-5" aria-hidden />
                   </span>
                   <h3 className="mt-5 text-lg font-semibold">{b.title}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{b.body}</p>
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                    {b.body}
+                  </p>
                 </div>
               </StaggerItem>
             ))}
