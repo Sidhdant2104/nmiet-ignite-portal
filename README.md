@@ -1,5 +1,5 @@
 # NMIET SIH Connect
-
+designed by sidhdant
 You are a senior UI/UX designer from Apple, Vercel, Stripe and Linear.
 
 Design and build a production-quality frontend for "NMIET SIH Portal" (Smart India Hackathon Portal for Nutan Maharashtra Institute of Engineering and Technology).
