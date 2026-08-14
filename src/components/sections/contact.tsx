@@ -42,7 +42,7 @@ export function ContactSection() {
                 </span>
                 <div className="min-w-0">
                   <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Name</p>
-                  <p className="mt-1 font-medium">Dr. Aishwini Shinde</p>
+                  <p className="mt-1 font-medium">Dr. Ashwini Shinde</p>
                 </div>
               </li>
               <li className="flex gap-4">
@@ -70,7 +70,7 @@ export function ContactSection() {
                 <div className="min-w-0">
                   <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Email</p>
                   <a href="mailto:sih@nmiet.edu.in" className="mt-1 block break-words font-medium transition-colors hover:text-primary">
-                    aishwini.shinde@nmiet.edu.in
+                    ashwini.shinde@nmiet.edu.in
                   </a>
                 </div>
               </li>

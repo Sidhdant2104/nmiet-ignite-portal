@@ -91,8 +91,8 @@ export const facultyLeadership: FacultyMember[] = [
   },
   {
     role: "SIH SPOC",
-    name: "Dr. Aishwini Shinde",
-    photo: photo("Dr-aishwini-shinde"),
+    name: "Dr. Ashwini Shinde",
+    photo: photo("Dr-ashwini-shinde"),
     designation: "Professor",
     department: "ENTC Engineering",
     description: "Serving as the official Single Point of Contact for Smart India Hackathon.",
