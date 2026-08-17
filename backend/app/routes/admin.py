@@ -276,7 +276,7 @@ async def bulk_registrations(payload: BulkRegistrationPayload, user=Depends(requ
 
 @router.get("/registrations/export")
 async def export_registrations(format: Literal["csv","xlsx"]="csv", search: Optional[str] = None, status: Optional[str] = None, theme: Optional[str] = None, category: Optional[str] = None, date_from: Optional[datetime] = None, date_to: Optional[datetime] = None, include_deleted: bool = False, sort_by: str = "created_at", sort_order: int = -1, user=Depends(require("export"))):
-    headers = ["Registration ID", "Registration Date", "Status", "Team Name", "PS ID", "Theme", "Category", "Leader Name", "Leader Email", "Leader Phone", "Leader Department", "Leader Year", "Faculty Name", "Faculty Email", "Faculty Phone"]
+    headers = ["Registration ID", "Registration Date", "Status", "Team Name", "Proposed Problem Statement Title", "PS ID", "Theme", "Category", "Leader Name", "Leader Email", "Leader Phone", "Leader Department", "Leader Year", "Faculty Name", "Faculty Email", "Faculty Phone"]
     for index in range(1, 7):
         headers.extend([f"Member {index} Name", f"Member {index} Email", f"Member {index} Phone", f"Member {index} Department", f"Member {index} Year"])
     headers.append("Remarks")
@@ -293,10 +293,10 @@ async def export_registrations(format: Literal["csv","xlsx"]="csv", search: Opti
 
     def registration_row(registration, for_excel=False):
         team, leader, mentor = registration.get("team", {}), registration.get("leader", {}), registration.get("mentor") or {}
-        row = [registration.get("registration_id") or str(registration.get("_id", "")), created_at(registration.get("created_at"), for_excel), registration.get("status", "Registered"), team.get("teamName", ""), team.get("psId", ""), team.get("theme", ""), team.get("category", ""), leader.get("name", ""), leader.get("email", ""), leader.get("mobile", ""), leader.get("department", ""), leader.get("year", ""), mentor.get("name", ""), mentor.get("email", ""), mentor.get("mobile", "")]
+        row = [registration.get("registration_id") or str(registration.get("_id", "")), created_at(registration.get("created_at"), for_excel), registration.get("status", "Registered"), team.get("teamName", ""), team.get("psTitle", ""), team.get("psId", "") or "Pending official PS", team.get("theme", ""), team.get("category", ""), leader.get("name", ""), leader.get("email", ""), leader.get("mobile", ""), leader.get("department", ""), leader.get("year", ""), mentor.get("name", ""), mentor.get("email", ""), mentor.get("mobile", "")]
         for member in registration.get("members", [])[:6]:
             row.extend([member.get("name", ""), member.get("email", ""), member.get("mobile", ""), member.get("department", ""), member.get("year", "")])
-        row.extend([""] * (30 - len(row) + 15))
+        row.extend([""] * (31 - len(row) + 15))
         row.append(registration.get("remarks", ""))
         return row
 
@@ -339,10 +339,10 @@ async def export_registrations(format: Literal["csv","xlsx"]="csv", search: Opti
     apply_sheet_style(registrations_sheet, status_column="C", date_column="B")
 
     members_sheet = workbook.create_sheet("Team Members")
-    members_sheet.append(["Registration ID", "Team Name", "PS ID", "Role", "Name", "Email", "Phone", "Department", "Year"])
+    members_sheet.append(["Registration ID", "Team Name", "Proposed Problem Statement Title", "PS ID", "Role", "Name", "Email", "Phone", "Department", "Year"])
     for registration in registrations:
         team, leader = registration.get("team", {}), registration.get("leader", {})
-        base = [registration.get("registration_id") or str(registration.get("_id", "")), team.get("teamName", ""), team.get("psId", "")]
+        base = [registration.get("registration_id") or str(registration.get("_id", "")), team.get("teamName", ""), team.get("psTitle", ""), team.get("psId", "") or "Pending official PS"]
         members_sheet.append(base + ["Leader", leader.get("name", ""), leader.get("email", ""), leader.get("mobile", ""), leader.get("department", ""), leader.get("year", "")])
         for index, member in enumerate(registration.get("members", []), start=1):
             members_sheet.append(base + [f"Member {index}", member.get("name", ""), member.get("email", ""), member.get("mobile", ""), member.get("department", ""), member.get("year", "")])

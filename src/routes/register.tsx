@@ -81,8 +81,7 @@ const personSchema = z.object({
 const schema = z.object({
     team: z.object({
       teamName: z.string().trim().min(3, "Team name must be at least 3 characters").max(60),
-      psTitle: z.string().trim().min(6, "Enter the problem statement title").max(200),
-      psId: z.string().trim().min(3, "Enter the problem statement ID").max(40),
+      psTitle: z.string().trim().min(6, "Enter the proposed problem statement title").max(200),
       category: z.enum(["Software", "Hardware"], { message: "Choose a category" }),
       theme: z.string().min(2, "Choose a theme"),
     }),
@@ -192,7 +191,7 @@ function RegisterPage() {
     resolver: zodResolver(schema),
     mode: "onTouched",
     defaultValues: {
-      team: { teamName: "", psTitle: "", psId: "", theme: "" },
+      team: { teamName: "", psTitle: "", theme: "" },
       leader: { ...emptyPerson },
       members: [
         { ...emptyPerson },
@@ -350,11 +349,12 @@ function RegisterPage() {
                   <Field label="Team name" error={errors.team?.teamName?.message}>
                     <Input placeholder="e.g. Team Aarambh" {...register("team.teamName")} />
                   </Field>
-                  <Field label="Problem statement title" error={errors.team?.psTitle?.message}>
-                    <Input placeholder="Paste the statement title" {...register("team.psTitle")} />
-                  </Field>
-                  <Field label="Problem statement ID" error={errors.team?.psId?.message}>
-                    <Input placeholder="e.g. SIH26-1042" {...register("team.psId")} />
+                  <Field
+                    label="Proposed Problem Statement Title"
+                    hint="Enter a short title describing the problem your team proposes to solve."
+                    error={errors.team?.psTitle?.message}
+                  >
+                    <Input placeholder="e.g. AI-based early detection of diabetic complications" {...register("team.psTitle")} />
                   </Field>
                   <Field label="Category" error={errors.team?.category?.message}>
                     <Select
@@ -805,8 +805,7 @@ function reviewGroups(values: Partial<FormValues>): ReviewGroup[] {
       step: 0,
       rows: [
         ["Team name", values.team?.teamName],
-        ["Problem statement", values.team?.psTitle],
-        ["PS ID", values.team?.psId],
+        ["Proposed problem statement", values.team?.psTitle],
         ["Category", values.team?.category],
         ["Theme", values.team?.theme],
       ],

@@ -1,12 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { Compass } from "lucide-react";
+import { Compass, Sparkles } from "lucide-react";
 import { AmbientBackdrop } from "@/components/ambient-backdrop";
 import { ProblemStatementExplorer } from "@/components/problem-statement-explorer";
 
 const title = "Problem Statements — NMIET SIH Portal";
 const description =
-  "Search, filter and sort every Smart India Hackathon problem statement by theme, category and organisation.";
+  "Official Smart India Hackathon problem statements will be published here once released.";
 
 export const Route = createFileRoute("/problem-statements")({
   head: () => ({
@@ -37,13 +37,18 @@ function ProblemStatementsPage() {
             <Compass className="h-3.5 w-3.5 text-primary" aria-hidden /> Smart India Hackathon 2026
           </span>
           <h1 className="mt-6 text-4xl font-semibold leading-[1.05] sm:text-5xl">
-            Problem <span className="text-gradient">Statements</span>
+            Official Problem Statements <span className="text-gradient">Coming Soon</span>
           </h1>
           <p className="mt-4 text-base leading-relaxed text-muted-foreground sm:text-lg">
-            Every statement is loaded live from the portal API. Filter down to your domain, note the
-            PS ID, and use it during registration.
+            Official SIH problem statements have not been released yet. Registration is currently
+            based on SIH themes, and teams may submit their own proposed problem statement title.
           </p>
         </motion.div>
+
+        <div className="mt-8 flex max-w-2xl items-start gap-3 rounded-3xl border border-primary/20 bg-primary/5 p-5 text-sm leading-relaxed text-muted-foreground">
+          <Sparkles className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden />
+          <p>Once official statements are released, they will appear here with search, filters, and full statement details.</p>
+        </div>
 
         <div className="mt-12">
           <ProblemStatementExplorer />

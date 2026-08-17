@@ -108,7 +108,7 @@ const teamFormation = [
 ];
 
 const internalProcess = [
-  { title: "Internal registration", body: "Submit team, problem statement and mentor details here." },
+  { title: "Internal registration", body: "Submit your team, theme, proposed problem statement title and mentor details here." },
   { title: "Idea review", body: "Coordinators check completeness, duplicates and eligibility." },
   { title: "Prototype build", body: "Build a demonstrable prototype during the build window." },
   { title: "Internal hackathon day", body: "Present live to the jury with a working demo." },
@@ -117,10 +117,10 @@ const internalProcess = [
 ];
 
 const psSelection = [
-  "Shortlist 3–5 problem statements your team can confidently solve.",
-  "Choose a statement that matches your team's technical strengths (Software or Hardware).",
+  "Choose an SIH theme that matches your team's technical strengths (Software or Hardware).",
+  "Define a focused proposed problem statement title within that theme.",
   "Evaluate the problem's feasibility, innovation potential, and expected impact.",
-  "Note the exact Problem Statement (PS) ID and title—you'll need them during registration.",
+  "Official SIH Problem Statements and PS IDs will be published when SIH releases them; they are not required for current registration.",
   "Avoid statements that depend on proprietary data, unavailable hardware, or unrealistic implementation timelines.",
 ];
 
@@ -312,7 +312,7 @@ function GuidelinesPage() {
   <div className="rounded-4xl border border-border bg-card p-6 shadow-soft">
     <ol className="grid gap-4 sm:grid-cols-2">
       {[
-        "Open the registration page and enter your team details along with the selected Problem Statement (PS) ID.",
+        "Open the registration page and enter your team details, selected theme and proposed problem statement title.",
         "Fill in complete details for the team leader and all five team members.",
         "Add faculty mentor details if available (optional and can be updated later if required).",
         "Review all the information carefully, then click Confirm & Submit to complete your registration.",

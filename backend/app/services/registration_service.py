@@ -29,7 +29,8 @@ class RegistrationService:
 
         team, leader = registration.get("team", {}), registration.get("leader", {})
         created = registration["created_at"]
-        await log_email(leader.get("email", ""), "NMIET SIH registration confirmed", f"Hello {leader.get('name', 'Team Leader')},\n\nYour NMIET SIH registration is confirmed.\n\nTeam name: {team.get('teamName')}\nReference ID: {registration['registration_id']}\nPS ID: {team.get('psId')}\nTheme: {team.get('theme')}\nRegistration date: {created:%d %b %Y}\n\nPPT Template: {PORTAL_URL}/ppt-template\nSubmission Guidelines: {PORTAL_URL}/submission-guidelines\nUpload PPT: {PORTAL_URL}/ppt-submission")
+        official_ps = team.get("psId") or "Pending official PS"
+        await log_email(leader.get("email", ""), "NMIET SIH registration confirmed", f"Hello {leader.get('name', 'Team Leader')},\n\nYour NMIET SIH registration is confirmed.\n\nTeam name: {team.get('teamName')}\nReference ID: {registration['registration_id']}\nProposed problem statement: {team.get('psTitle')}\nOfficial PS ID: {official_ps}\nTheme: {team.get('theme')}\nRegistration date: {created:%d %b %Y}\n\nPPT Template: {PORTAL_URL}/ppt-template\nSubmission Guidelines: {PORTAL_URL}/submission-guidelines\nUpload PPT: {PORTAL_URL}/ppt-submission")
 
         return {
             "id": str(result.inserted_id),

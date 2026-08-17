@@ -106,6 +106,15 @@ export function ProblemStatementExplorer() {
 
   const isEmpty = !isLoading && !isError && (data?.length ?? 0) === 0;
 
+  if (isEmpty) {
+    return (
+      <EmptyState
+        title="Official SIH Problem Statements Coming Soon"
+        body="Current registrations are based on SIH themes. Choose a theme and add your team's proposed problem statement title during registration. Official statements will be published here once released."
+      />
+    );
+  }
+
   return (
     <div>
       <div className="glass sticky top-20 z-30 rounded-4xl p-4 shadow-lift sm:p-5">
@@ -203,8 +212,6 @@ export function ProblemStatementExplorer() {
             title="Couldn't load problem statements"
             body="The portal API didn't respond. Refresh the page to try again."
           />
-        ) : isEmpty ? (
-          <EmptyState title="No problem statements available." />
         ) : filtered.length === 0 ? (
           <EmptyState title="No problem statements match your filters." />
         ) : (

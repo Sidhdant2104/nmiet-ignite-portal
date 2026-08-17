@@ -13,12 +13,12 @@ const primaryNavItems = [
   { label: "About", href: "/#about" },
   { label: "Themes", href: "/themes" },
   { label: "Problems", href: "/problem-statements" },
-  { label: "Journey", href: "/previous-years" },
+  { label: "Guidelines", href: "/guidelines" },
 ];
 
 const moreNavItems = [
   { label: "Organizing Committee", href: "/organizing-committee" },
-  { label: "Guidelines", href: "/guidelines" },
+  { label: "Journey", href: "/previous-years" },
   { label: "PPT Submission", href: "/ppt-submission" },
   { label: "PPT Template", href: "/ppt-template" },
   { label: "Timeline", href: "/#selection" },
