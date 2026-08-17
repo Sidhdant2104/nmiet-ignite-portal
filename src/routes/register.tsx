@@ -430,7 +430,7 @@ function RegisterPage() {
 
               {step === 3 ? (
                 <Fieldset
-                  legend="Faculty mentor"
+                  legend="Faculty mentor (Optional)"
                   hint="Confirm with your mentor before submitting."
                 >
                   <Field label="Full name" error={errors.mentor?.name?.message}>
