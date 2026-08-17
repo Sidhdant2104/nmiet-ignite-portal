@@ -1,7 +1,7 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.schemas.person import Person
 from app.schemas.team import Team
@@ -29,3 +29,18 @@ class Registration(BaseModel):
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_empty_mentor(cls, value: Any):
+        """Treat an untouched optional mentor form section as no mentor."""
+        if not isinstance(value, dict):
+            return value
+
+        mentor = value.get("mentor")
+        if isinstance(mentor, dict) and not any(
+            item is not None and str(item).strip() for item in mentor.values()
+        ):
+            value = {**value}
+            value.pop("mentor", None)
+        return value

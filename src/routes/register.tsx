@@ -277,7 +277,11 @@ function RegisterPage() {
 
   const onSubmit = async (data: FormValues) => {
     setConfirmOpen(false);
-    const res = await submitRegistration(data);
+    const { mentor, ...registration } = data;
+    const hasMentorDetails = Object.values(mentor ?? {}).some(
+      (value) => typeof value === "string" && value.trim() !== "",
+    );
+    const res = await submitRegistration(hasMentorDetails ? data : registration);
     localStorage.removeItem(DRAFT_KEY);
     setSubmitted({
           reference: res.data.registration_id,

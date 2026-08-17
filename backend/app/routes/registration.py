@@ -22,7 +22,8 @@ async def create_registration(registration: Registration):
     if control and not control.get("is_open", True):
         raise HTTPException(status_code=403, detail="Registrations are currently closed.")
 
-    registration_dict = registration.model_dump()
+    # Do not persist optional fields that were not supplied (mentor and psId).
+    registration_dict = registration.model_dump(exclude_none=True)
 
     inserted_id = await registration_service.create_registration(
         registration_dict
