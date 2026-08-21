@@ -64,11 +64,16 @@ class ProblemScraper(BaseScraper):
 
 
 async def main():
-    """Run the scraper standalone with debug output enabled."""
+    """Run the scraper standalone with optional database sync.
+
+    Flags:
+        --debug   Print a diagnostic block for each entry.
+        --sync    Persist scraped problems to MongoDB after extraction.
+    """
     import sys
 
-    # Enable debug mode via --debug flag
     debug = "--debug" in sys.argv
+    sync = "--sync" in sys.argv
 
     # Configure logging
     logging.basicConfig(
@@ -81,14 +86,11 @@ async def main():
     problems = await scraper.run(debug=debug)
 
     print(f"\n{'=' * 50}")
-    print(f"Total Problems: {len(problems)}")
+    print(f"  ✅ Scraped: {len(problems)} problem statements")
     print(f"{'=' * 50}")
 
-    if debug:
-        # In debug mode the per-entry output is already printed
-        pass
-    else:
-        # Print a compact summary
+    if not sync:
+        # Print a compact summary and exit
         for p in problems[:10]:
             print(
                 f"  {p['ps_number']} | "
@@ -97,6 +99,50 @@ async def main():
             )
         if len(problems) > 10:
             print(f"  ... and {len(problems) - 10} more")
+        print("\n💡 Tip: Use --sync to persist to MongoDB")
+        return
+
+    # ── Persist to MongoDB ────────────────────────────────────────────
+    from app.mongodb import db, client
+
+    collection = db["problems"]
+
+    # Verify connectivity
+    try:
+        await client.admin.command("ping")
+        print("  ✅ MongoDB connected")
+    except Exception as e:
+        print(f"  ❌ MongoDB connection failed: {e}")
+        return
+
+    inserted = 0
+    updated = 0
+
+    for problem in problems:
+        existing = await collection.find_one(
+            {"ps_number": problem["ps_number"]}
+        )
+
+        if existing:
+            # Preserve the original created_at timestamp
+            problem.pop("created_at", None)
+            await collection.update_one(
+                {"_id": existing["_id"]},
+                {"$set": problem}
+            )
+            updated += 1
+        else:
+            await collection.insert_one(problem)
+            inserted += 1
+
+    print(f"\n{'=' * 50}")
+    print(f"  ✅ Inserted: {inserted}")
+    print(f"  ✅ Updated:  {updated}")
+    print(f"  ✅ Total:    {len(problems)}")
+    print(f"  ✅ Database sync complete")
+    print(f"{'=' * 50}")
+
+    client.close()
 
 
 if __name__ == "__main__":
