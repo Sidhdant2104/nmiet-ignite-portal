@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  ArrowRight,
   Building2,
   Calendar,
   ChevronLeft,
@@ -309,6 +311,14 @@ function ProblemCard({ ps, index }: { ps: ProblemStatement; index: number }) {
           </span>
         ) : null}
       </div>
+      <Link
+        to="/problem-statements/$psNumber"
+        params={{ psNumber: ps.ps_number }}
+        className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-primary/20 bg-primary/5 px-4 py-2.5 text-sm font-medium text-primary transition-all hover:bg-primary hover:text-primary-foreground"
+      >
+        View Details
+        <ArrowRight className="h-4 w-4" />
+      </Link>
     </motion.article>
   );
 }

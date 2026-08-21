@@ -20,6 +20,7 @@ type ThemesResponse = {
 
 /** Backend problem statement shape from GET /problems/ */
 export type ProblemStatement = {
+  _id?: string;
   ps_number: string;
   title: string;
   organization: string;
@@ -27,6 +28,10 @@ export type ProblemStatement = {
   category: string;
   theme: string;
   description: string | null;
+  expected_solution: string | null;
+  youtube_link: string | null;
+  dataset_link: string | null;
+  contact_info: string | null;
   submitted_ideas: number;
   deadline: string | null;
   source_url: string | null;
@@ -37,6 +42,11 @@ type ProblemStatementsResponse = {
   success: boolean;
   count: number;
   data: ProblemStatement[];
+};
+
+type ProblemDetailResponse = {
+  success: boolean;
+  data: ProblemStatement;
 };
 
 
@@ -73,6 +83,15 @@ export const problemStatementsQuery = queryOptions({
   queryFn: () => getJson<ProblemStatementsResponse>("/problems/").then((d) => d.data),
   staleTime: 5 * 60 * 1000,
 });
+
+export const problemDetailQuery = (psNumber: string) =>
+  queryOptions({
+    queryKey: ["problem-detail", psNumber],
+    queryFn: () =>
+      getJson<ProblemDetailResponse>(`/problems/${psNumber}`).then((d) => d.data),
+    staleTime: 5 * 60 * 1000,
+    enabled: !!psNumber,
+  });
 
 export const announcementsQuery = queryOptions({
   queryKey: ["announcements"],
