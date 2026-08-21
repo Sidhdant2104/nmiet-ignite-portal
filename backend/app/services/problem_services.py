@@ -60,6 +60,9 @@ class ProblemService:
 
             if existing:
 
+                # Preserve the original created_at timestamp
+                problem.pop("created_at", None)
+
                 await self.collection.update_one(
                     {"_id": existing["_id"]},
                     {"$set": problem}

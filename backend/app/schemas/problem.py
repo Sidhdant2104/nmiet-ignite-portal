@@ -4,6 +4,12 @@ from typing import Optional
 
 
 class Problem(BaseModel):
+    """Schema for an SIH problem statement.
+
+    Core fields are required; optional fields gracefully handle
+    entries that are incomplete or have different structures on
+    the portal.
+    """
 
     ps_number: str
 
@@ -16,6 +22,12 @@ class Problem(BaseModel):
     theme: str
 
     description: Optional[str] = None
+    expected_solution: Optional[str] = None
+
+    # Optional resource links — not all problem statements include these
+    youtube_link: Optional[str] = None
+    dataset_link: Optional[str] = None
+    contact_info: Optional[str] = None
 
     submitted_ideas: int = 0
 
