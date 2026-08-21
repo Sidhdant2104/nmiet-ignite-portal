@@ -278,7 +278,19 @@ function RegisterPage() {
 
   const onSubmit = async (data: FormValues) => {
     setConfirmOpen(false);
-    const res = await submitRegistration(data);
+    const payload = {
+      ...data,
+      mentor:
+        data.mentor?.name ||
+        data.mentor?.email ||
+        data.mentor?.mobile ||
+        data.mentor?.department
+          ? data.mentor
+          : null,
+    };
+
+    const res = await submitRegistration(payload);
+    
     localStorage.removeItem(DRAFT_KEY);
     setSubmitted({
           reference: res.data.registration_id,
