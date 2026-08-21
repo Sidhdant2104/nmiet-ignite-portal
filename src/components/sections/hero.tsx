@@ -114,11 +114,11 @@ export function Hero() {
 
             <div className="hover-lift rounded-3xl border border-border bg-card/70 p-5 backdrop-blur">
               <dt className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
-                Problem statements
+                Internal Hackathon Date
               </dt>
-              <dd className="mt-1.5 font-display text-xl font-semibold">Coming soon</dd>
+              <dd className="mt-1.5 font-display text-xl font-semibold">4th September 2025</dd>
               <p className="mt-1.5 text-[0.7rem] leading-snug text-muted-foreground">
-                Will be updated automatically once officially released by SIH
+                Last date of Registration and PPT submission will be 2nd Sept 2026
               </p>
             </div>
 
