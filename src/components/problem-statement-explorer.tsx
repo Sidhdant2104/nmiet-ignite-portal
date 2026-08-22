@@ -12,6 +12,7 @@ import {
   Lightbulb,
   Search,
   SlidersHorizontal,
+  Sparkles,
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -46,37 +47,49 @@ function formatDeadline(deadline: string): string {
 
 export function ProblemStatementExplorer() {
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [theme, setTheme] = useState("all");
   const [category, setCategory] = useState("all");
   const [organization, setOrganization] = useState("all");
-  const [sort, setSort] = useState("id-asc");
+  const [sort, setSort] = useState("default");
   const [page, setPage] = useState(1);
 
+  // Debounce search query input (300ms)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(query.trim());
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  // Fetch problem statements from server with AI-based search & filter parameters
   const { data, isLoading, isError } = useQuery(
-    problemStatementsQuery({ theme: theme === "all" ? undefined : theme }),
+    problemStatementsQuery({
+      theme: theme === "all" ? undefined : theme,
+      category: category === "all" ? undefined : category,
+      organization: organization === "all" ? undefined : organization,
+      search: debouncedQuery || undefined,
+    }),
   );
   const { data: themes } = useQuery(themesQuery);
 
+  // Fallback query to extract all unique organizations and categories across the database
+  const { data: allStatements } = useQuery(
+    problemStatementsQuery({}),
+  );
+
   const organizations = useMemo(
-    () => Array.from(new Set((data ?? []).map((p) => p.organization))).sort(),
-    [data],
+    () => Array.from(new Set((allStatements ?? data ?? []).map((p) => p.organization))).filter(Boolean).sort(),
+    [allStatements, data],
   );
 
   const categories = useMemo(
-    () => Array.from(new Set((data ?? []).map((p) => p.category))).sort(),
-    [data],
+    () => Array.from(new Set((allStatements ?? data ?? []).map((p) => p.category))).filter(Boolean).sort(),
+    [allStatements, data],
   );
 
   const filtered = useMemo(() => {
-    let list = data ?? [];
-    const q = query.trim().toLowerCase();
-    if (q) {
-      list = list.filter((p) =>
-        [p.title, p.ps_number, p.organization].join(" ").toLowerCase().includes(q),
-      );
-    }
-    if (category !== "all") list = list.filter((p) => p.category === category);
-    if (organization !== "all") list = list.filter((p) => p.organization === organization);
+    const list = data ?? [];
 
     return [...list].sort((a, b) => {
       switch (sort) {
@@ -84,15 +97,22 @@ export function ProblemStatementExplorer() {
           return a.title.localeCompare(b.title);
         case "org-asc":
           return a.organization.localeCompare(b.organization);
+        case "id-asc":
+          return a.ps_number.localeCompare(b.ps_number);
+        case "relevance":
+          return (b.relevance_score ?? 0) - (a.relevance_score ?? 0);
         default:
+          if (debouncedQuery) {
+            return (b.relevance_score ?? 0) - (a.relevance_score ?? 0);
+          }
           return a.ps_number.localeCompare(b.ps_number);
       }
     });
-  }, [data, query, category, organization, sort]);
+  }, [data, sort, debouncedQuery]);
 
   useEffect(() => {
     setPage(1);
-  }, [query, theme, category, organization, sort]);
+  }, [query, debouncedQuery, theme, category, organization, sort]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const current = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -102,9 +122,11 @@ export function ProblemStatementExplorer() {
 
   const reset = () => {
     setQuery("");
+    setDebouncedQuery("");
     setTheme("all");
     setCategory("all");
     setOrganization("all");
+    setSort("default");
   };
 
   const isEmpty = !isLoading && !isError && (data?.length ?? 0) === 0;
@@ -120,10 +142,23 @@ export function ProblemStatementExplorer() {
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by title, PS number or organisation"
+            placeholder="Search by idea, keyword, or technology (AI, water, disaster, blockchain...)"
             aria-label="Search problem statements"
             className="h-14 rounded-3xl border-border bg-card/70 pl-12 text-base"
           />
+          {query ? (
+            <button
+              type="button"
+              onClick={() => {
+                setQuery("");
+                setDebouncedQuery("");
+              }}
+              aria-label="Clear search input"
+              className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          ) : null}
         </div>
 
         <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -161,6 +196,11 @@ export function ProblemStatementExplorer() {
               <SelectValue placeholder="Sort" />
             </SelectTrigger>
             <SelectContent>
+              {debouncedQuery ? (
+                <SelectItem value="default">Relevance (Best match)</SelectItem>
+              ) : (
+                <SelectItem value="default">PS number (ascending)</SelectItem>
+              )}
               <SelectItem value="id-asc">PS number (ascending)</SelectItem>
               <SelectItem value="title-asc">Title (A–Z)</SelectItem>
               <SelectItem value="org-asc">Organisation (A–Z)</SelectItem>
@@ -169,9 +209,17 @@ export function ProblemStatementExplorer() {
         </div>
 
         {hasFilters ? (
-          <div className="mt-3 flex items-center justify-between gap-3 px-1">
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3 px-1">
             <p className="text-xs text-muted-foreground" aria-live="polite">
-              {filtered.length} of {data?.length ?? 0} statements
+              {debouncedQuery ? (
+                <span>
+                  Found <strong className="text-foreground font-semibold">{filtered.length}</strong> problem {filtered.length === 1 ? "statement" : "statements"} related to &ldquo;<strong className="text-primary font-medium">{debouncedQuery}</strong>&rdquo;
+                </span>
+              ) : (
+                <span>
+                  {filtered.length} of {data?.length ?? 0} statements
+                </span>
+              )}
             </p>
             <button
               type="button"
@@ -206,10 +254,20 @@ export function ProblemStatementExplorer() {
             title="Couldn't load problem statements"
             body="The portal API didn't respond. Refresh the page to try again."
           />
-        ) : isEmpty ? (
-          <EmptyState title="No problem statements available." />
-        ) : filtered.length === 0 ? (
-          <EmptyState title="No problem statements match your filters." />
+        ) : isEmpty || filtered.length === 0 ? (
+          debouncedQuery ? (
+            <EmptyState
+              title="No matching problem statements found"
+              body="Try keywords like AI, IoT, blockchain, disaster, healthcare."
+            />
+          ) : hasFilters ? (
+            <EmptyState
+              title="No problem statements match your filters"
+              body="Try clearing or changing your theme and category filters."
+            />
+          ) : (
+            <EmptyState title="No problem statements available." />
+          )
         ) : (
           <>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -285,6 +343,11 @@ function ProblemCard({ ps, index }: { ps: ProblemStatement; index: number }) {
         <span className="rounded-full border border-border px-2.5 py-1 text-[0.68rem] font-semibold text-muted-foreground">
           {ps.category}
         </span>
+        {ps.relevance_score != null && ps.relevance_score > 0 ? (
+          <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[0.65rem] font-medium text-primary">
+            <Sparkles className="h-2.5 w-2.5" aria-hidden /> Match
+          </span>
+        ) : null}
       </div>
       <h3 className="mt-4 font-display text-lg font-semibold leading-snug">{ps.title}</h3>
       <p className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">

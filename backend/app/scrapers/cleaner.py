@@ -139,3 +139,70 @@ def strip_label_prefix(text: str) -> str:
     if not text:
         return ""
     return re.sub(r"^[\s•\-\*]+", "", text).strip()
+
+
+# ── Reusable text normalization & regex helpers ───────────────────────────
+
+def normalize_text(value: Optional[str]) -> str:
+    """Normalize text: convert to lowercase, strip, and collapse multiple whitespace
+    characters into a single space."""
+    if not value:
+        return ""
+    fixed = fix_encoding(str(value))
+    cleaned = re.sub(r"\s+", " ", fixed).strip()
+    return cleaned.lower()
+
+
+def canonicalize_name(name: Optional[str]) -> str:
+    """Standardize theme, category, or organization formatting:
+    - Clean encoding & collapse whitespace
+    - Standardize spacing around delimiters (e.g. ' / ', ' & ')
+    - Capitalize / title-case cleanly while preserving abbreviations.
+    """
+    if not name:
+        return ""
+    fixed = fix_encoding(str(name))
+    cleaned = re.sub(r"\s+", " ", fixed).strip()
+    cleaned = re.sub(r"\s*/\s*", " / ", cleaned)
+    cleaned = re.sub(r"\s*&\s*", " & ", cleaned)
+
+    if cleaned.isupper() or cleaned.islower():
+        abbreviations = {
+            "AI", "ML", "IOT", "SIH", "DRDO", "ISRO", "NER", "IT", "GIS", "GPS",
+            "AICTE", "MIC", "MOE", "ICT", "AR", "VR", "EV", "SMS", "IP",
+            "DDOS", "API", "UI", "UX"
+        }
+        words = cleaned.split()
+        formatted_words = []
+        for w in words:
+            upper_w = w.upper()
+            if upper_w in abbreviations:
+                formatted_words.append(upper_w)
+            elif w.lower() in ("and", "or", "in", "of", "for", "to", "the"):
+                formatted_words.append(w.lower())
+            elif w in ("&", "/", "-"):
+                formatted_words.append(w)
+            else:
+                formatted_words.append(w.capitalize())
+        cleaned = " ".join(formatted_words)
+        if cleaned and cleaned[0].islower():
+            cleaned = cleaned[0].upper() + cleaned[1:]
+
+    return cleaned
+
+
+def build_flexible_regex(value: Optional[str], whole_phrase: bool = True) -> str:
+    """Build a MongoDB regex pattern that matches across whitespace and delimiter
+    variations (e.g. slashes, ampersands, dashes) regardless of casing or extra spaces."""
+    if not value:
+        return ""
+    norm = normalize_text(value)
+    tokens = [re.escape(w) for w in re.split(r"[\s/&,-]+", norm) if w]
+    if not tokens:
+        return ""
+    
+    inner = r"[\s/&,-]+".join(tokens)
+    if whole_phrase:
+        return r"^[\s]*" + inner + r"[\s]*$"
+    return inner
+

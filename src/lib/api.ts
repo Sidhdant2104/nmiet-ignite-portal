@@ -35,6 +35,8 @@ export type ProblemStatement = {
   submitted_ideas: number;
   deadline: string | null;
   source_url: string | null;
+  searchable_text?: string | null;
+  relevance_score?: number | null;
   is_active: boolean;
 };
 
@@ -78,13 +80,37 @@ export const themesQuery = queryOptions({
   staleTime: 5 * 60 * 1000,
 });
 
-export const problemStatementsQuery = ({ theme }: { theme?: string } = {}) => {
-  const query = theme ? `?theme=${encodeURIComponent(theme)}` : "";
+export const problemStatementsQuery = ({
+  theme,
+  category,
+  search,
+  organization,
+}: {
+  theme?: string | undefined;
+  category?: string | undefined;
+  search?: string | undefined;
+  organization?: string | undefined;
+} = {}) => {
+  const params = new URLSearchParams();
+  if (theme && theme !== "all") params.append("theme", theme);
+  if (category && category !== "all") params.append("category", category);
+  if (organization && organization !== "all") params.append("organization", organization);
+  if (search && search.trim()) params.append("search", search.trim());
+
+  const queryString = params.toString() ? `?${params.toString()}` : "";
 
   return queryOptions({
-    queryKey: ["problem-statements", { theme: theme ?? null }],
+    queryKey: [
+      "problem-statements",
+      {
+        theme: theme && theme !== "all" ? theme : null,
+        category: category && category !== "all" ? category : null,
+        organization: organization && organization !== "all" ? organization : null,
+        search: search?.trim() || null,
+      },
+    ],
     queryFn: () =>
-      getJson<ProblemStatementsResponse>(`/problems/${query}`).then((d) => d.data),
+      getJson<ProblemStatementsResponse>(`/problems/${queryString}`).then((d) => d.data),
     staleTime: 5 * 60 * 1000,
   });
 };

@@ -16,7 +16,6 @@ import { Route as PptSubmissionRouteImport } from './routes/ppt-submission'
 import { Route as PptTemplateRouteImport } from './routes/ppt-template'
 import { Route as PreviousYearsRouteImport } from './routes/previous-years'
 import { Route as ProblemStatementsRouteImport } from './routes/problem-statements'
-import { Route as ProblemStatementsPsNumberRouteImport } from './routes/problem-statements/$psNumber'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as SubmissionGuidelinesRouteImport } from './routes/submission-guidelines'
 import { Route as ThemesRouteImport } from './routes/themes'
@@ -34,6 +33,7 @@ import { Route as ApiRegisterRouteImport } from './routes/api/register'
 import { Route as ApiThemesRouteImport } from './routes/api/themes'
 import { Route as JudgeEvaluationRouteImport } from './routes/judge/evaluation'
 import { Route as JudgeLoginRouteImport } from './routes/judge/login'
+import { Route as ProblemStatementsPsNumberRouteImport } from './routes/problem-statements/$psNumber'
 import { Route as TrackLoginRouteImport } from './routes/track/login'
 import { Route as TrackQueueRouteImport } from './routes/track/queue'
 import { Route as AdminEvaluationIndexRouteImport } from './routes/admin/evaluation/index'
@@ -77,11 +77,6 @@ const PreviousYearsRoute = PreviousYearsRouteImport.update({
 const ProblemStatementsRoute = ProblemStatementsRouteImport.update({
   id: '/problem-statements',
   path: '/problem-statements',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ProblemStatementsPsNumberRoute = ProblemStatementsPsNumberRouteImport.update({
-  id: '/problem-statements/$psNumber',
-  path: '/problem-statements/$psNumber',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RegisterRoute = RegisterRouteImport.update({
@@ -169,6 +164,12 @@ const JudgeLoginRoute = JudgeLoginRouteImport.update({
   path: '/judge/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProblemStatementsPsNumberRoute =
+  ProblemStatementsPsNumberRouteImport.update({
+    id: '/$psNumber',
+    path: '/$psNumber',
+    getParentRoute: () => ProblemStatementsRoute,
+  } as any)
 const TrackLoginRoute = TrackLoginRouteImport.update({
   id: '/track/login',
   path: '/track/login',
@@ -223,8 +224,7 @@ export interface FileRoutesByFullPath {
   '/ppt-submission': typeof PptSubmissionRoute
   '/ppt-template': typeof PptTemplateRoute
   '/previous-years': typeof PreviousYearsRoute
-  '/problem-statements': typeof ProblemStatementsRoute
-  '/problem-statements/$psNumber': typeof ProblemStatementsPsNumberRoute
+  '/problem-statements': typeof ProblemStatementsRouteWithChildren
   '/register': typeof RegisterRoute
   '/submission-guidelines': typeof SubmissionGuidelinesRoute
   '/themes': typeof ThemesRoute
@@ -241,6 +241,7 @@ export interface FileRoutesByFullPath {
   '/api/themes': typeof ApiThemesRoute
   '/judge/evaluation': typeof JudgeEvaluationRoute
   '/judge/login': typeof JudgeLoginRoute
+  '/problem-statements/$psNumber': typeof ProblemStatementsPsNumberRoute
   '/track/login': typeof TrackLoginRoute
   '/track/queue': typeof TrackQueueRoute
   '/admin/': typeof AdminIndexRoute
@@ -259,8 +260,7 @@ export interface FileRoutesByTo {
   '/ppt-submission': typeof PptSubmissionRoute
   '/ppt-template': typeof PptTemplateRoute
   '/previous-years': typeof PreviousYearsRoute
-  '/problem-statements': typeof ProblemStatementsRoute
-  '/problem-statements/$psNumber': typeof ProblemStatementsPsNumberRoute
+  '/problem-statements': typeof ProblemStatementsRouteWithChildren
   '/register': typeof RegisterRoute
   '/submission-guidelines': typeof SubmissionGuidelinesRoute
   '/themes': typeof ThemesRoute
@@ -277,6 +277,7 @@ export interface FileRoutesByTo {
   '/api/themes': typeof ApiThemesRoute
   '/judge/evaluation': typeof JudgeEvaluationRoute
   '/judge/login': typeof JudgeLoginRoute
+  '/problem-statements/$psNumber': typeof ProblemStatementsPsNumberRoute
   '/track/login': typeof TrackLoginRoute
   '/track/queue': typeof TrackQueueRoute
   '/admin': typeof AdminIndexRoute
@@ -296,8 +297,7 @@ export interface FileRoutesById {
   '/ppt-submission': typeof PptSubmissionRoute
   '/ppt-template': typeof PptTemplateRoute
   '/previous-years': typeof PreviousYearsRoute
-  '/problem-statements': typeof ProblemStatementsRoute
-  '/problem-statements/$psNumber': typeof ProblemStatementsPsNumberRoute
+  '/problem-statements': typeof ProblemStatementsRouteWithChildren
   '/register': typeof RegisterRoute
   '/submission-guidelines': typeof SubmissionGuidelinesRoute
   '/themes': typeof ThemesRoute
@@ -314,6 +314,7 @@ export interface FileRoutesById {
   '/api/themes': typeof ApiThemesRoute
   '/judge/evaluation': typeof JudgeEvaluationRoute
   '/judge/login': typeof JudgeLoginRoute
+  '/problem-statements/$psNumber': typeof ProblemStatementsPsNumberRoute
   '/track/login': typeof TrackLoginRoute
   '/track/queue': typeof TrackQueueRoute
   '/admin/': typeof AdminIndexRoute
@@ -335,7 +336,6 @@ export interface FileRouteTypes {
     | '/ppt-template'
     | '/previous-years'
     | '/problem-statements'
-    | '/problem-statements/$psNumber'
     | '/register'
     | '/submission-guidelines'
     | '/themes'
@@ -352,6 +352,7 @@ export interface FileRouteTypes {
     | '/api/themes'
     | '/judge/evaluation'
     | '/judge/login'
+    | '/problem-statements/$psNumber'
     | '/track/login'
     | '/track/queue'
     | '/admin/'
@@ -371,7 +372,6 @@ export interface FileRouteTypes {
     | '/ppt-template'
     | '/previous-years'
     | '/problem-statements'
-    | '/problem-statements/$psNumber'
     | '/register'
     | '/submission-guidelines'
     | '/themes'
@@ -388,6 +388,7 @@ export interface FileRouteTypes {
     | '/api/themes'
     | '/judge/evaluation'
     | '/judge/login'
+    | '/problem-statements/$psNumber'
     | '/track/login'
     | '/track/queue'
     | '/admin'
@@ -423,6 +424,7 @@ export interface FileRouteTypes {
     | '/api/themes'
     | '/judge/evaluation'
     | '/judge/login'
+    | '/problem-statements/$psNumber'
     | '/track/login'
     | '/track/queue'
     | '/admin/'
@@ -442,8 +444,7 @@ export interface RootRouteChildren {
   PptSubmissionRoute: typeof PptSubmissionRoute
   PptTemplateRoute: typeof PptTemplateRoute
   PreviousYearsRoute: typeof PreviousYearsRoute
-  ProblemStatementsRoute: typeof ProblemStatementsRoute
-  ProblemStatementsPsNumberRoute: typeof ProblemStatementsPsNumberRoute
+  ProblemStatementsRoute: typeof ProblemStatementsRouteWithChildren
   RegisterRoute: typeof RegisterRoute
   SubmissionGuidelinesRoute: typeof SubmissionGuidelinesRoute
   ThemesRoute: typeof ThemesRoute
@@ -519,13 +520,6 @@ declare module '@tanstack/react-router' {
       path: '/problem-statements'
       fullPath: '/problem-statements'
       preLoaderRoute: typeof ProblemStatementsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/problem-statements/$psNumber': {
-      id: '/problem-statements/$psNumber'
-      path: '/problem-statements/$psNumber'
-      fullPath: '/problem-statements/$psNumber'
-      preLoaderRoute: typeof ProblemStatementsPsNumberRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/register': {
@@ -647,6 +641,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof JudgeLoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/problem-statements/$psNumber': {
+      id: '/problem-statements/$psNumber'
+      path: '/$psNumber'
+      fullPath: '/problem-statements/$psNumber'
+      preLoaderRoute: typeof ProblemStatementsPsNumberRouteImport
+      parentRoute: typeof ProblemStatementsRoute
+    }
     '/track/login': {
       id: '/track/login'
       path: '/track/login'
@@ -713,6 +714,17 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface ProblemStatementsRouteChildren {
+  ProblemStatementsPsNumberRoute: typeof ProblemStatementsPsNumberRoute
+}
+
+const ProblemStatementsRouteChildren: ProblemStatementsRouteChildren = {
+  ProblemStatementsPsNumberRoute: ProblemStatementsPsNumberRoute,
+}
+
+const ProblemStatementsRouteWithChildren =
+  ProblemStatementsRoute._addFileChildren(ProblemStatementsRouteChildren)
+
 interface AdminPptRouteChildren {
   AdminPptIdRoute: typeof AdminPptIdRoute
 }
@@ -743,8 +755,7 @@ const rootRouteChildren: RootRouteChildren = {
   PptSubmissionRoute: PptSubmissionRoute,
   PptTemplateRoute: PptTemplateRoute,
   PreviousYearsRoute: PreviousYearsRoute,
-  ProblemStatementsRoute: ProblemStatementsRoute,
-  ProblemStatementsPsNumberRoute: ProblemStatementsPsNumberRoute,
+  ProblemStatementsRoute: ProblemStatementsRouteWithChildren,
   RegisterRoute: RegisterRoute,
   SubmissionGuidelinesRoute: SubmissionGuidelinesRoute,
   ThemesRoute: ThemesRoute,

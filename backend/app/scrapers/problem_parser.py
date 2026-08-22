@@ -25,6 +25,7 @@ from bs4 import BeautifulSoup, Tag
 from playwright.async_api import Page
 
 from app.scrapers.cleaner import (
+    canonicalize_name,
     clean_html_to_text,
     extract_link_href,
     extract_text_or_link,
@@ -217,16 +218,16 @@ class ProblemParser:
                 or link_title
                 or outer.get("title", "")
             ),
-            "organization": (
+            "organization": canonicalize_name(
                 inner.get("organization")
                 or outer.get("organization", "")
             ),
             "department": inner.get("department", ""),
-            "category": (
+            "category": canonicalize_name(
                 inner.get("category")
                 or outer.get("category", "")
             ),
-            "theme": (
+            "theme": canonicalize_name(
                 inner.get("theme")
                 or outer.get("theme", "")
             ),

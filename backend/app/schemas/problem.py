@@ -35,7 +35,11 @@ class Problem(BaseModel):
 
     source_url: Optional[str] = None
 
+    # Search & relevance metadata
+    searchable_text: Optional[str] = None
+    relevance_score: Optional[float] = None
+
     is_active: bool = True
 
     created_at: datetime
-    updated_at: datetime
+    updated_at: datetime

@@ -3,7 +3,6 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Building2, Filter, Inbox, Search, SlidersHorizontal, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { SectionHeading } from "@/components/section-heading";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -13,17 +12,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { problemStatementsQuery, themesQuery } from "@/lib/api";
-import type { ProblemStatement } from "@/lib/sih-data";
-
-const difficultyTone: Record<ProblemStatement["difficulty"], string> = {
-  Beginner: "bg-brand-green/15 text-brand-green",
-  Intermediate: "bg-primary-soft text-primary",
-  Advanced: "bg-brand-blue/15 text-brand-blue",
-};
+import { problemStatementsQuery, themesQuery, type ProblemStatement } from "@/lib/api";
 
 export function ProblemStatementsSection() {
-  const { data, isLoading, isError } = useQuery(problemStatementsQuery);
+  const { data, isLoading, isError } = useQuery(problemStatementsQuery());
   const { data: themes } = useQuery(themesQuery);
 
   const [query, setQuery] = useState("");
@@ -36,26 +28,23 @@ export function ProblemStatementsSection() {
     const q = query.trim().toLowerCase();
     if (q) {
       list = list.filter((p) =>
-        [p.title, p.organization, p.psId, p.theme, ...p.tags]
+        [p.title, p.organization, p.ps_number, p.theme]
           .join(" ")
           .toLowerCase()
           .includes(q),
       );
     }
-    if (theme !== "all") list = list.filter((p) => p.theme === theme);
-    if (category !== "all") list = list.filter((p) => p.category === category);
+    if (theme !== "all") list = list.filter((p) => p.theme.toLowerCase() === theme.toLowerCase());
+    if (category !== "all") list = list.filter((p) => p.category.toLowerCase() === category.toLowerCase());
 
-    const rank = { Beginner: 0, Intermediate: 1, Advanced: 2 } as const;
     return [...list].sort((a, b) => {
       switch (sort) {
         case "title-asc":
           return a.title.localeCompare(b.title);
-        case "difficulty-asc":
-          return rank[a.difficulty] - rank[b.difficulty];
-        case "difficulty-desc":
-          return rank[b.difficulty] - rank[a.difficulty];
+        case "org-asc":
+          return a.organization.localeCompare(b.organization);
         default:
-          return a.psId.localeCompare(b.psId);
+          return a.ps_number.localeCompare(b.ps_number);
       }
     });
   }, [data, query, theme, category, sort]);
@@ -139,8 +128,7 @@ export function ProblemStatementsSection() {
               <SelectContent>
                 <SelectItem value="id-asc">PS ID (ascending)</SelectItem>
                 <SelectItem value="title-asc">Title (A–Z)</SelectItem>
-                <SelectItem value="difficulty-asc">Easiest first</SelectItem>
-                <SelectItem value="difficulty-desc">Hardest first</SelectItem>
+                <SelectItem value="org-asc">Organisation (A–Z)</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -192,7 +180,7 @@ export function ProblemStatementsSection() {
               <AnimatePresence mode="popLayout">
                 {filtered.map((ps, i) => (
                   <motion.article
-                    key={ps.id}
+                    key={ps.ps_number}
                     layout
                     initial={{ opacity: 0, y: 18, scale: 0.98 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -207,12 +195,7 @@ export function ProblemStatementsSection() {
                     />
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="rounded-full bg-accent px-2.5 py-1 font-mono text-[0.68rem] font-semibold text-accent-foreground">
-                        {ps.psId}
-                      </span>
-                      <span
-                        className={`rounded-full px-2.5 py-1 text-[0.68rem] font-semibold ${difficultyTone[ps.difficulty]}`}
-                      >
-                        {ps.difficulty}
+                        {ps.ps_number}
                       </span>
                       <span className="rounded-full border border-border px-2.5 py-1 text-[0.68rem] font-semibold text-muted-foreground">
                         {ps.category}
@@ -226,17 +209,11 @@ export function ProblemStatementsSection() {
                       <span className="min-w-0 truncate">{ps.organization}</span>
                     </p>
                     <p className="mt-1.5 text-xs font-medium text-primary">{ps.theme}</p>
-                    <div className="mt-5 flex flex-wrap gap-2 pt-1">
-                      {ps.tags.map((tag) => (
-                        <Badge
-                          key={tag}
-                          variant="secondary"
-                          className="rounded-full bg-secondary font-normal text-secondary-foreground"
-                        >
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
+                    {ps.description ? (
+                      <p className="mt-3 text-xs leading-relaxed text-muted-foreground line-clamp-3">
+                        {ps.description}
+                      </p>
+                    ) : null}
                   </motion.article>
                 ))}
               </AnimatePresence>
