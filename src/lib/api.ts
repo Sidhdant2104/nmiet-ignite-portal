@@ -78,11 +78,16 @@ export const themesQuery = queryOptions({
   staleTime: 5 * 60 * 1000,
 });
 
-export const problemStatementsQuery = queryOptions({
-  queryKey: ["problem-statements"],
-  queryFn: () => getJson<ProblemStatementsResponse>("/problems/").then((d) => d.data),
-  staleTime: 5 * 60 * 1000,
-});
+export const problemStatementsQuery = ({ theme }: { theme?: string } = {}) => {
+  const query = theme ? `?theme=${encodeURIComponent(theme)}` : "";
+
+  return queryOptions({
+    queryKey: ["problem-statements", { theme: theme ?? null }],
+    queryFn: () =>
+      getJson<ProblemStatementsResponse>(`/problems/${query}`).then((d) => d.data),
+    staleTime: 5 * 60 * 1000,
+  });
+};
 
 export const problemDetailQuery = (psNumber: string) =>
   queryOptions({

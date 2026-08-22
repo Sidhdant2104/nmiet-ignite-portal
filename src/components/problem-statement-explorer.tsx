@@ -45,15 +45,17 @@ function formatDeadline(deadline: string): string {
 }
 
 export function ProblemStatementExplorer() {
-  const { data, isLoading, isError } = useQuery(problemStatementsQuery);
-  const { data: themes } = useQuery(themesQuery);
-
   const [query, setQuery] = useState("");
   const [theme, setTheme] = useState("all");
   const [category, setCategory] = useState("all");
   const [organization, setOrganization] = useState("all");
   const [sort, setSort] = useState("id-asc");
   const [page, setPage] = useState(1);
+
+  const { data, isLoading, isError } = useQuery(
+    problemStatementsQuery({ theme: theme === "all" ? undefined : theme }),
+  );
+  const { data: themes } = useQuery(themesQuery);
 
   const organizations = useMemo(
     () => Array.from(new Set((data ?? []).map((p) => p.organization))).sort(),
@@ -73,7 +75,6 @@ export function ProblemStatementExplorer() {
         [p.title, p.ps_number, p.organization].join(" ").toLowerCase().includes(q),
       );
     }
-    if (theme !== "all") list = list.filter((p) => p.theme === theme);
     if (category !== "all") list = list.filter((p) => p.category === category);
     if (organization !== "all") list = list.filter((p) => p.organization === organization);
 
@@ -87,7 +88,7 @@ export function ProblemStatementExplorer() {
           return a.ps_number.localeCompare(b.ps_number);
       }
     });
-  }, [data, query, theme, category, organization, sort]);
+  }, [data, query, category, organization, sort]);
 
   useEffect(() => {
     setPage(1);

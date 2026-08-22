@@ -1,3 +1,5 @@
+import re
+
 from app.mongodb import db
 from app.scrapers.problem_scraper import ProblemScraper
 
@@ -38,7 +40,9 @@ class ProblemService:
             })
 
         if theme:
-            conditions.append({"theme": theme})
+            conditions.append({
+                "theme": {"$regex": re.escape(theme.strip()), "$options": "i"}
+            })
 
         if category:
             conditions.append({"category": category})
