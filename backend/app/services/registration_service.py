@@ -4,10 +4,12 @@ from fastapi import HTTPException
 from app.mongodb import registration_collection, settings_collection
 from app.validators.registration_validator import registration_validator
 import re
+import logging
 from datetime import datetime
-from app.routes.ppt import log_email
 from app.config import PORTAL_URL
 import math
+
+logger = logging.getLogger(__name__)
 
 class RegistrationService:
 
@@ -24,12 +26,54 @@ class RegistrationService:
         registration["registration_id"] = await self.generate_registration_id()
         registration["created_at"] = datetime.utcnow()
         registration["updated_at"] = datetime.utcnow()
+        registration["email_status"] = "pending"
 
         result = await registration_collection.insert_one(registration)
 
-        team, leader = registration.get("team", {}), registration.get("leader", {})
-        created = registration["created_at"]
-        await log_email(leader.get("email", ""), "NMIET SIH registration confirmed", f"Hello {leader.get('name', 'Team Leader')},\n\nYour NMIET SIH registration is confirmed.\n\nTeam name: {team.get('teamName')}\nReference ID: {registration['registration_id']}\nPS ID: {team.get('psId')}\nTheme: {team.get('theme')}\nRegistration date: {created:%d %b %Y}\n\nPPT Template: {PORTAL_URL}/ppt-template\nSubmission Guidelines: {PORTAL_URL}/submission-guidelines\nUpload PPT: {PORTAL_URL}/ppt-submission")
+        # Send HTML confirmation email (never blocks registration)
+        try:
+            from app.services.email_service import send_registration_confirmation_email
+
+            team = registration.get("team", {})
+            leader = registration.get("leader", {})
+            mentor = registration.get("mentor")
+            members = registration.get("members", [])
+
+            email_sent = await send_registration_confirmation_email(
+                recipient_email=leader.get("email", ""),
+                team_name=team.get("teamName", ""),
+                team_leader=leader.get("name", "Team Leader"),
+                problem_statement={
+                    "psId": team.get("psId", ""),
+                    "psTitle": team.get("psTitle", ""),
+                    "theme": team.get("theme", ""),
+                    "category": team.get("category", ""),
+                },
+                members=members,
+                mentor=mentor,
+                registration_id=registration["registration_id"],
+                created_at=registration["created_at"],
+            )
+
+            if email_sent:
+                await registration_collection.update_one(
+                    {"_id": result.inserted_id},
+                    {"$set": {"email_status": "sent", "email_sent_at": datetime.utcnow()}},
+                )
+            else:
+                await registration_collection.update_one(
+                    {"_id": result.inserted_id},
+                    {"$set": {"email_status": "failed"}},
+                )
+        except Exception as error:
+            logger.error("Registration email failed for %s: %s", registration["registration_id"], error)
+            try:
+                await registration_collection.update_one(
+                    {"_id": result.inserted_id},
+                    {"$set": {"email_status": "failed"}},
+                )
+            except Exception:
+                pass
 
         return {
             "id": str(result.inserted_id),

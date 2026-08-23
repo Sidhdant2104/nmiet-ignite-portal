@@ -78,12 +78,14 @@ def team_summary(item):
     }
 
 
-async def log_email(to: str, subject: str, body: str):
+async def log_email(to: str, subject: str, body: str, html: str | None = None):
     event = {
         "to": to, "subject": subject, "body": body,
         "created_at": datetime.now(timezone.utc),
         "delivery": "queued" if SMTP_HOST else "not_configured",
     }
+    if html:
+        event["has_html"] = True
     await email_collection.insert_one(event)
     if not SMTP_HOST:
         return
@@ -92,6 +94,8 @@ async def log_email(to: str, subject: str, body: str):
     msg["To"] = to
     msg["Subject"] = subject
     msg.set_content(body)
+    if html:
+        msg.add_alternative(html, subtype="html")
     try:
         with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10) as server:
             server.starttls()
