@@ -294,20 +294,26 @@ async def upload(
     })
 
     summary = team_summary(item)
-    await log_email(
-        summary["leader_email"],
-        "PPT Submission Received",
-        (
-            f"Hello {summary['leader_name']},\n\n"
-            f"PPT Submission Received\n"
-            f"Team: {summary['team_name']}\n"
-            f"Reference ID: {summary['reference_id']}\n"
-            f"Upload time: {now:%d %b %Y, %I:%M %p UTC}\n"
-            f"Status: PPT Submitted\n\n"
-            f"The file can be replaced before the submission deadline.\n"
-            f"{PORTAL_URL}/ppt-submission"
-        ),
-    )
+    try:
+         await log_email(
+                summary["leader_email"],
+                "PPT Submission Received",
+                (
+                    f"Hello {summary['leader_name']},\n\n"
+                    f"PPT Submission Received\n"
+                    f"Team: {summary['team_name']}\n"
+                    f"Reference ID: {summary['reference_id']}\n"
+                    f"Upload time: {now:%d %b %Y, %I:%M %p UTC}\n"
+                    f"Status: PPT Submitted\n\n"
+                    f"The file can be replaced before the submission deadline.\n"
+                    f"{PORTAL_URL}/ppt-submission"
+                ),
+            )
+    except Exception as e:
+        print(f"EMAIL FAILED BUT UPLOAD SUCCESSFUL: {e}")
+
+
+   
 
     return {
         "success": True,
