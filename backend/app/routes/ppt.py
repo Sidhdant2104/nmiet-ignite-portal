@@ -88,6 +88,7 @@ async def log_email(to: str, subject: str, body: str, html: str | None = None):
         event["has_html"] = True
     await email_collection.insert_one(event)
     if not SMTP_HOST:
+        print(f"⚠️ EMAIL SKIPPED: SMTP_HOST not configured. To: {to}")
         return
     msg = EmailMessage()
     msg["From"] = SMTP_FROM
@@ -96,21 +97,28 @@ async def log_email(to: str, subject: str, body: str, html: str | None = None):
     msg.set_content(body)
     if html:
         msg.add_alternative(html, subtype="html")
+    print(f"📧 EMAIL TRIGGER STARTED: To={to}, Subject={subject}")
+    print(f"   SMTP: host={SMTP_HOST}:{SMTP_PORT}, user={SMTP_USERNAME}, from={SMTP_FROM}")
     try:
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10) as server:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as server:
+            server.ehlo()
             server.starttls()
+            server.ehlo()
             if SMTP_USERNAME:
                 server.login(SMTP_USERNAME, SMTP_PASSWORD or "")
             server.send_message(msg)
+        print(f"✅ EMAIL SENT SUCCESSFULLY: To={to}")
         await email_collection.update_one(
             {"_id": event.get("_id")},
             {"$set": {"delivery": "sent", "sent_at": datetime.now(timezone.utc)}},
         )
     except Exception as error:
+        print(f"❌ EMAIL FAILED: To={to}, Error={error}")
         await email_collection.update_one(
             {"to": to, "subject": subject, "created_at": event["created_at"]},
             {"$set": {"delivery": "failed", "error": str(error)}},
         )
+        raise  # Re-raise so callers know email failed
 
 
 def upload_token(item):

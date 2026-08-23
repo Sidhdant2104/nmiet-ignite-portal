@@ -33,6 +33,8 @@ async def send_registration_confirmation_email(
     try:
         subject = "NMIET SIH 2026 Internal Hackathon Registration Confirmed"
 
+        print(f"📨 REGISTRATION EMAIL: Building email for {recipient_email} (Team: {team_name}, ID: {registration_id})")
+
         # Build plain-text fallback
         plain = _build_plain_text(
             team_leader=team_leader,
@@ -55,15 +57,20 @@ async def send_registration_confirmation_email(
             created_at=created_at,
         )
 
+        print(f"📨 REGISTRATION EMAIL: Calling log_email for {recipient_email}")
+
         await log_email(
             to=recipient_email,
             subject=subject,
             body=plain,
             html=html,
         )
+
+        print(f"✅ REGISTRATION EMAIL: Successfully sent to {recipient_email}")
         return True
 
     except Exception as error:
+        print(f"❌ REGISTRATION EMAIL FAILED: {recipient_email} — {error}")
         logger.error(
             "Failed to send registration confirmation email to %s: %s",
             recipient_email,

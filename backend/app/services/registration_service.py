@@ -39,6 +39,8 @@ class RegistrationService:
             mentor = registration.get("mentor")
             members = registration.get("members", [])
 
+            print(f"📧 EMAIL TRIGGER STARTED: Registration {registration['registration_id']} — leader={leader.get('email', '')}")
+
             email_sent = await send_registration_confirmation_email(
                 recipient_email=leader.get("email", ""),
                 team_name=team.get("teamName", ""),
@@ -56,16 +58,19 @@ class RegistrationService:
             )
 
             if email_sent:
+                print(f"✅ EMAIL SENT SUCCESSFULLY: Registration {registration['registration_id']}")
                 await registration_collection.update_one(
                     {"_id": result.inserted_id},
                     {"$set": {"email_status": "sent", "email_sent_at": datetime.utcnow()}},
                 )
             else:
+                print(f"❌ EMAIL FAILED: Registration {registration['registration_id']} — send returned False")
                 await registration_collection.update_one(
                     {"_id": result.inserted_id},
                     {"$set": {"email_status": "failed"}},
                 )
         except Exception as error:
+            print(f"❌ EMAIL FAILED: Registration {registration['registration_id']} — {error}")
             logger.error("Registration email failed for %s: %s", registration["registration_id"], error)
             try:
                 await registration_collection.update_one(
