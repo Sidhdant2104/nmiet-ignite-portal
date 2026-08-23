@@ -1,10 +1,11 @@
 from bson import ObjectId
-from fastapi import HTTPException
+from fastapi import BackgroundTasks, HTTPException
 
 from app.mongodb import registration_collection, settings_collection
 from app.validators.registration_validator import registration_validator
 import re
 import logging
+import time
 from datetime import datetime
 from app.config import PORTAL_URL
 import math
@@ -15,33 +16,46 @@ class RegistrationService:
 
 
 
-    async def create_registration(self, registration: dict):
+    async def create_registration(self, registration: dict, background_tasks: BackgroundTasks | None = None):
+        t_start = time.monotonic()
 
         control = await settings_collection.find_one({"key": "registration_control"})
         if control and control.get("is_open") is False:
             raise HTTPException(status_code=403, detail="Registrations are currently closed. Please check back later or contact the SIH Coordinators.")
 
-        await registration_validator.validate_registration(registration)
+        print(f"\n{'='*60}")
+        print(f"📋 REGISTRATION START")
 
+        t0 = time.monotonic()
+        await registration_validator.validate_registration(registration)
+        print(f"   ✓ VALIDATION COMPLETE: {time.monotonic() - t0:.3f}s")
+
+        t0 = time.monotonic()
         registration["registration_id"] = await self.generate_registration_id()
+        print(f"   ✓ ID GENERATED ({registration['registration_id']}): {time.monotonic() - t0:.3f}s")
+
         registration["created_at"] = datetime.utcnow()
         registration["updated_at"] = datetime.utcnow()
         registration["email_status"] = "pending"
 
+        t0 = time.monotonic()
         result = await registration_collection.insert_one(registration)
+        print(f"   ✓ DATABASE INSERT COMPLETE: {time.monotonic() - t0:.3f}s")
 
-        # Send HTML confirmation email (never blocks registration)
-        try:
-            from app.services.email_service import send_registration_confirmation_email
+        # Schedule email as a background task — runs AFTER response is sent
+        inserted_id = result.inserted_id
+        reg_id = registration["registration_id"]
+        team = registration.get("team", {})
+        leader = registration.get("leader", {})
+        mentor = registration.get("mentor")
+        members = registration.get("members", [])
+        created_at = registration["created_at"]
 
-            team = registration.get("team", {})
-            leader = registration.get("leader", {})
-            mentor = registration.get("mentor")
-            members = registration.get("members", [])
-
-            print(f"📧 EMAIL TRIGGER STARTED: Registration {registration['registration_id']} — leader={leader.get('email', '')}")
-
-            email_sent = await send_registration_confirmation_email(
+        if background_tasks is not None:
+            background_tasks.add_task(
+                self._send_confirmation_email_background,
+                inserted_id=inserted_id,
+                registration_id=reg_id,
                 recipient_email=leader.get("email", ""),
                 team_name=team.get("teamName", ""),
                 team_leader=leader.get("name", "Team Leader"),
@@ -53,37 +67,75 @@ class RegistrationService:
                 },
                 members=members,
                 mentor=mentor,
-                registration_id=registration["registration_id"],
-                created_at=registration["created_at"],
+                created_at=created_at,
+            )
+            print(f"   ✓ EMAIL TASK QUEUED (background): 0.000s")
+        else:
+            print(f"   ⚠️ No BackgroundTasks — email skipped")
+
+        total = time.monotonic() - t_start
+        print(f"   ✓ RESPONSE SENT: {total:.3f}s total")
+        print(f"{'='*60}\n")
+
+        return {
+            "id": str(inserted_id),
+            "registration_id": reg_id
+        }
+
+    async def _send_confirmation_email_background(
+        self,
+        inserted_id,
+        registration_id: str,
+        recipient_email: str,
+        team_name: str,
+        team_leader: str,
+        problem_statement: dict,
+        members: list,
+        mentor: dict | None,
+        created_at: datetime,
+    ):
+        """Runs as a FastAPI BackgroundTask — after the HTTP response is already sent."""
+        print(f"\n📧 BACKGROUND EMAIL START: {registration_id} → {recipient_email}")
+        t0 = time.monotonic()
+        try:
+            from app.services.email_service import send_registration_confirmation_email
+
+            email_sent = await send_registration_confirmation_email(
+                recipient_email=recipient_email,
+                team_name=team_name,
+                team_leader=team_leader,
+                problem_statement=problem_statement,
+                members=members,
+                mentor=mentor,
+                registration_id=registration_id,
+                created_at=created_at,
             )
 
+            elapsed = time.monotonic() - t0
             if email_sent:
-                print(f"✅ EMAIL SENT SUCCESSFULLY: Registration {registration['registration_id']}")
+                print(f"✅ BACKGROUND EMAIL SENT: {registration_id} ({elapsed:.2f}s)")
                 await registration_collection.update_one(
-                    {"_id": result.inserted_id},
+                    {"_id": inserted_id},
                     {"$set": {"email_status": "sent", "email_sent_at": datetime.utcnow()}},
                 )
             else:
-                print(f"❌ EMAIL FAILED: Registration {registration['registration_id']} — send returned False")
+                print(f"❌ BACKGROUND EMAIL FAILED: {registration_id} — send returned False ({elapsed:.2f}s)")
                 await registration_collection.update_one(
-                    {"_id": result.inserted_id},
+                    {"_id": inserted_id},
                     {"$set": {"email_status": "failed"}},
                 )
         except Exception as error:
-            print(f"❌ EMAIL FAILED: Registration {registration['registration_id']} — {error}")
-            logger.error("Registration email failed for %s: %s", registration["registration_id"], error)
+            elapsed = time.monotonic() - t0
+            print(f"❌ BACKGROUND EMAIL FAILED: {registration_id} — {error} ({elapsed:.2f}s)")
+            logger.error("Background email failed for %s: %s", registration_id, error)
             try:
                 await registration_collection.update_one(
-                    {"_id": result.inserted_id},
+                    {"_id": inserted_id},
                     {"$set": {"email_status": "failed"}},
                 )
             except Exception:
                 pass
 
-        return {
-            "id": str(result.inserted_id),
-            "registration_id": registration["registration_id"]
-        }
     async def get_all_registrations(
         self,
         page: int,

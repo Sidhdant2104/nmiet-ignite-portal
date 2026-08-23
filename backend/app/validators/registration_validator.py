@@ -14,49 +14,61 @@ class RegistrationValidator:
             *registration["members"]
         ]
 
-        # Check emails
+        # Batch check: collect all emails and mobiles, query once each
+        all_emails = [p["email"] for p in participants]
+        all_mobiles = [p["mobile"] for p in participants]
+
+        # Single query for all email duplicates
+        email_cursor = registration_collection.find(
+            {
+                "$or": [
+                    {"leader.email": {"$in": all_emails}},
+                    {"members.email": {"$in": all_emails}},
+                ]
+            },
+            {"leader.email": 1, "members.email": 1}
+        )
+        existing_emails = set()
+        async for doc in email_cursor:
+            existing_emails.add(doc.get("leader", {}).get("email"))
+            for m in doc.get("members", []):
+                existing_emails.add(m.get("email"))
+
         for index, participant in enumerate(participants):
-
-            existing = await registration_collection.find_one(
-                {
-                    "$or": [
-                        {"leader.email": participant["email"]},
-                        {"members.email": participant["email"]}
-                    ]
-                }
-            )
-
-            if existing:
+            if participant["email"] in existing_emails:
                 field = (
                     "leader.email"
                     if index == 0
                     else f"members[{index-1}].email"
                 )
-
                 errors.append({
                     "field": field,
                     "message": f'{participant["email"]} is already registered.'
                 })
 
-        # Check mobiles
+        # Single query for all mobile duplicates
+        mobile_cursor = registration_collection.find(
+            {
+                "$or": [
+                    {"leader.mobile": {"$in": all_mobiles}},
+                    {"members.mobile": {"$in": all_mobiles}},
+                ]
+            },
+            {"leader.mobile": 1, "members.mobile": 1}
+        )
+        existing_mobiles = set()
+        async for doc in mobile_cursor:
+            existing_mobiles.add(doc.get("leader", {}).get("mobile"))
+            for m in doc.get("members", []):
+                existing_mobiles.add(m.get("mobile"))
+
         for index, participant in enumerate(participants):
-
-            existing = await registration_collection.find_one(
-                {
-                    "$or": [
-                        {"leader.mobile": participant["mobile"]},
-                        {"members.mobile": participant["mobile"]}
-                    ]
-                }
-            )
-
-            if existing:
+            if participant["mobile"] in existing_mobiles:
                 field = (
                     "leader.mobile"
                     if index == 0
                     else f"members[{index-1}].mobile"
                 )
-
                 errors.append({
                     "field": field,
                     "message": f'{participant["mobile"]} is already registered.'

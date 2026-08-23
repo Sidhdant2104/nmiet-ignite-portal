@@ -114,6 +114,18 @@ async def create_indexes():
     )
 
     await ensure_index(
+        registration_collection,
+        "members.email",
+        name="members_email_index",
+    )
+
+    await ensure_index(
+        registration_collection,
+        "members.mobile",
+        name="members_mobile_index",
+    )
+
+    await ensure_index(
         announcement_collection,
         [
             ("is_published", 1),
