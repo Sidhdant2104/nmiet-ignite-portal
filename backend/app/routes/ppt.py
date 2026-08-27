@@ -78,7 +78,7 @@ def team_summary(item):
     }
 
 
-async def log_email(to: str, subject: str, body: str, html: str | None = None):
+async def log_email(to: str, subject: str, body: str, html: str | None = None, attachment_path: str | None = None):
     event = {
         "to": to, "subject": subject, "body": body,
         "created_at": datetime.now(timezone.utc),
@@ -97,6 +97,28 @@ async def log_email(to: str, subject: str, body: str, html: str | None = None):
     msg.set_content(body)
     if html:
         msg.add_alternative(html, subtype="html")
+
+    if attachment_path:
+        import os
+        if os.path.exists(attachment_path):
+            import mimetypes
+            ctype, encoding = mimetypes.guess_type(attachment_path)
+            if ctype is None or encoding is not None:
+                ctype = 'application/octet-stream'
+            maintype, subtype = ctype.split('/', 1)
+            try:
+                with open(attachment_path, 'rb') as fp:
+                    msg.add_attachment(
+                        fp.read(),
+                        maintype=maintype,
+                        subtype=subtype,
+                        filename=os.path.basename(attachment_path)
+                    )
+                print(f"📎 ATTACHED FILE SUCCESSFULLY: {attachment_path}")
+            except Exception as attachment_err:
+                print(f"⚠️ ATTACHMENT ERROR for {attachment_path}: {attachment_err}")
+        else:
+            print(f"⚠️ ATTACHMENT NOT FOUND: {attachment_path}")
     print(f"📧 EMAIL TRIGGER STARTED: To={to}, Subject={subject}")
     print(f"   SMTP: host={SMTP_HOST}:{SMTP_PORT}, user={SMTP_USERNAME}, from={SMTP_FROM}")
     try:

@@ -59,11 +59,16 @@ async def send_registration_confirmation_email(
 
         print(f"📨 REGISTRATION EMAIL: Calling log_email for {recipient_email}")
 
+        import os
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        attachment_path = os.path.join(current_dir, "..", "SIH2026-IDEA-Presentation-Format.pptx")
+
         await log_email(
             to=recipient_email,
             subject=subject,
             body=plain,
             html=html,
+            attachment_path=attachment_path,
         )
 
         print(f"✅ REGISTRATION EMAIL: Successfully sent to {recipient_email}")
