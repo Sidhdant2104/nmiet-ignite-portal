@@ -141,7 +141,8 @@ async def log_email(to: str, subject: str, body: str, html: str | None = None, a
                 import json
                 headers = {
                     "Authorization": f"Bearer {resend_api_key}",
-                    "Content-Type": "application/json"
+                    "Content-Type": "application/json",
+                    "User-Agent": "NMIET-Portal/1.0"
                 }
                 req = urllib.request.Request(
                     "https://api.resend.com/emails",
@@ -215,7 +216,8 @@ async def log_email(to: str, subject: str, body: str, html: str | None = None, a
             import json
             headers = {
                 "api-key": brevo_api_key,
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
+                "User-Agent": "NMIET-Portal/1.0"
             }
             req = urllib.request.Request(
                 "https://api.brevo.com/v3/smtp/email",
