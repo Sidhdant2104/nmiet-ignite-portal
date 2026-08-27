@@ -104,56 +104,73 @@ async def log_email(to: str, subject: str, body: str, html: str | None = None, a
         event["has_html"] = True
     await email_collection.insert_one(event)
 
+    errors = []
+
     # 1. Try Resend HTTP API (Port 443, safe from cloud port blocks)
     if resend_api_key:
         print(f"📧 EMAIL TRIGGER STARTED (Resend HTTP API): To={to}, Subject={subject}")
-        payload = {
-            "from": SMTP_FROM,
-            "to": [to],
-            "subject": subject,
-            "html": html or body,
-            "text": body
-        }
-        if attachment_path and os.path.exists(attachment_path):
-            try:
-                import base64
-                with open(attachment_path, "rb") as f:
-                    file_data = f.read()
-                payload["attachments"] = [
-                    {
-                        "filename": os.path.basename(attachment_path),
-                        "content": base64.b64encode(file_data).decode("utf-8")
-                    }
-                ]
-            except Exception as att_err:
-                print(f"⚠️ Resend attachment encoding failed: {att_err}")
-        
-        try:
-            import urllib.request
-            import json
-            headers = {
-                "Authorization": f"Bearer {resend_api_key}",
-                "Content-Type": "application/json"
+        # Unverified domain fallback logic:
+        # First attempt tries to send from SMTP_FROM.
+        # Second attempt tries to send from onboarding@resend.dev.
+        for attempt in [1, 2]:
+            from_sender = SMTP_FROM if attempt == 1 else "onboarding@resend.dev"
+            payload = {
+                "from": from_sender,
+                "to": [to],
+                "subject": subject,
+                "html": html or body,
+                "text": body
             }
-            req = urllib.request.Request(
-                "https://api.resend.com/emails",
-                data=json.dumps(payload).encode("utf-8"),
-                headers=headers,
-                method="POST"
-            )
-            with urllib.request.urlopen(req, timeout=15) as response:
-                res_body = response.read().decode("utf-8")
-                if response.status in [200, 201, 202]:
-                    print(f"✅ EMAIL SENT SUCCESSFULLY (Resend): To={to}")
-                    await email_collection.update_one(
-                        {"_id": event.get("_id")},
-                        {"$set": {"delivery": "sent", "sent_at": datetime.now(timezone.utc)}},
-                    )
-                    return
-                else:
-                    print(f"⚠️ Resend API responded with status {response.status}: {res_body}")
-        except Exception as resend_err:
-            print(f"⚠️ Resend HTTP API call failed: {resend_err}")
+            if attachment_path and os.path.exists(attachment_path):
+                try:
+                    import base64
+                    with open(attachment_path, "rb") as f:
+                        file_data = f.read()
+                    payload["attachments"] = [
+                        {
+                            "filename": os.path.basename(attachment_path),
+                            "content": base64.b64encode(file_data).decode("utf-8")
+                        }
+                    ]
+                except Exception as att_err:
+                    print(f"⚠️ Resend attachment encoding failed: {att_err}")
+            
+            try:
+                import urllib.request
+                import json
+                headers = {
+                    "Authorization": f"Bearer {resend_api_key}",
+                    "Content-Type": "application/json"
+                }
+                req = urllib.request.Request(
+                    "https://api.resend.com/emails",
+                    data=json.dumps(payload).encode("utf-8"),
+                    headers=headers,
+                    method="POST"
+                )
+                with urllib.request.urlopen(req, timeout=15) as response:
+                    res_body = response.read().decode("utf-8")
+                    if response.status in [200, 201, 202]:
+                        print(f"✅ EMAIL SENT SUCCESSFULLY (Resend): To={to}")
+                        await email_collection.update_one(
+                            {"_id": event.get("_id")},
+                            {"$set": {"delivery": "sent", "sent_at": datetime.now(timezone.utc)}},
+                        )
+                        return
+                    else:
+                        err_text = f"Resend API error status {response.status}: {res_body}"
+                        print(f"⚠️ {err_text}")
+                        if attempt == 1:
+                            print("⚠️ Retrying with onboarding@resend.dev...")
+                            continue
+                        errors.append(err_text)
+            except Exception as resend_err:
+                err_text = f"Resend HTTP API call failed: {resend_err}"
+                print(f"⚠️ {err_text}")
+                if attempt == 1:
+                    print("⚠️ Retrying with onboarding@resend.dev...")
+                    continue
+                errors.append(err_text)
 
     # 2. Try Brevo HTTP API (Port 443, safe from cloud port blocks)
     if brevo_api_key:
@@ -203,16 +220,23 @@ async def log_email(to: str, subject: str, body: str, html: str | None = None, a
                     )
                     return
                 else:
-                    print(f"⚠️ Brevo API responded with status {response.status}: {res_body}")
+                    err_text = f"Brevo API error status {response.status}: {res_body}"
+                    print(f"⚠️ {err_text}")
+                    errors.append(err_text)
         except Exception as brevo_err:
-            print(f"⚠️ Brevo HTTP API call failed: {brevo_err}")
+            err_text = f"Brevo HTTP API call failed: {brevo_err}"
+            print(f"⚠️ {err_text}")
+            errors.append(err_text)
 
     # 3. Fall back to SMTP
     if not SMTP_HOST:
-        print(f"⚠️ EMAIL SKIPPED: SMTP_HOST and HTTP APIs not configured. To: {to}")
+        print(f"⚠️ EMAIL SKIPPED: SMTP_HOST and HTTP APIs not configured/failed. To: {to}")
+        err_msg = "SMTP_HOST and HTTP API keys not configured"
+        if errors:
+            err_msg = f"HTTP methods failed: {' | '.join(errors)}"
         await email_collection.update_one(
             {"_id": event.get("_id")},
-            {"$set": {"delivery": "not_configured", "error": "SMTP_HOST and HTTP API keys not configured"}},
+            {"$set": {"delivery": "not_configured", "error": err_msg}},
         )
         return
 
@@ -261,10 +285,13 @@ async def log_email(to: str, subject: str, body: str, html: str | None = None, a
             {"$set": {"delivery": "sent", "sent_at": datetime.now(timezone.utc)}},
         )
     except Exception as error:
+        err_msg = f"SMTP error: {error}"
         print(f"❌ EMAIL FAILED (SMTP): To={to}, Error={error}")
+        if errors:
+            err_msg = f"HTTP methods failed: {' | '.join(errors)} | {err_msg}"
         await email_collection.update_one(
             {"_id": event.get("_id")},
-            {"$set": {"delivery": "failed", "error": str(error)}},
+            {"$set": {"delivery": "failed", "error": err_msg}},
         )
         raise  # Re-raise so callers know email failed
 
