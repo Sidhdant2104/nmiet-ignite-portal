@@ -78,18 +78,144 @@ def team_summary(item):
     }
 
 
+def _parse_from_header(from_str: str):
+    import re
+    match = re.match(r"^(.*?)\s*<(.*?)>$", from_str)
+    if match:
+        name = match.group(1).strip()
+        email = match.group(2).strip()
+        if name.startswith('"') and name.endswith('"'):
+            name = name[1:-1].strip()
+        return name, email
+    return "NMIET SIH 2026", from_str.strip()
+
+
 async def log_email(to: str, subject: str, body: str, html: str | None = None, attachment_path: str | None = None):
+    import os
+    resend_api_key = os.getenv("RESEND_API_KEY")
+    brevo_api_key = os.getenv("BREVO_API_KEY")
+    
     event = {
         "to": to, "subject": subject, "body": body,
         "created_at": datetime.now(timezone.utc),
-        "delivery": "queued" if SMTP_HOST else "not_configured",
+        "delivery": "queued" if (SMTP_HOST or resend_api_key or brevo_api_key) else "not_configured",
     }
     if html:
         event["has_html"] = True
     await email_collection.insert_one(event)
+
+    # 1. Try Resend HTTP API (Port 443, safe from cloud port blocks)
+    if resend_api_key:
+        print(f"📧 EMAIL TRIGGER STARTED (Resend HTTP API): To={to}, Subject={subject}")
+        payload = {
+            "from": SMTP_FROM,
+            "to": [to],
+            "subject": subject,
+            "html": html or body,
+            "text": body
+        }
+        if attachment_path and os.path.exists(attachment_path):
+            try:
+                import base64
+                with open(attachment_path, "rb") as f:
+                    file_data = f.read()
+                payload["attachments"] = [
+                    {
+                        "filename": os.path.basename(attachment_path),
+                        "content": base64.b64encode(file_data).decode("utf-8")
+                    }
+                ]
+            except Exception as att_err:
+                print(f"⚠️ Resend attachment encoding failed: {att_err}")
+        
+        try:
+            import urllib.request
+            import json
+            headers = {
+                "Authorization": f"Bearer {resend_api_key}",
+                "Content-Type": "application/json"
+            }
+            req = urllib.request.Request(
+                "https://api.resend.com/emails",
+                data=json.dumps(payload).encode("utf-8"),
+                headers=headers,
+                method="POST"
+            )
+            with urllib.request.urlopen(req, timeout=15) as response:
+                res_body = response.read().decode("utf-8")
+                if response.status in [200, 201, 202]:
+                    print(f"✅ EMAIL SENT SUCCESSFULLY (Resend): To={to}")
+                    await email_collection.update_one(
+                        {"_id": event.get("_id")},
+                        {"$set": {"delivery": "sent", "sent_at": datetime.now(timezone.utc)}},
+                    )
+                    return
+                else:
+                    print(f"⚠️ Resend API responded with status {response.status}: {res_body}")
+        except Exception as resend_err:
+            print(f"⚠️ Resend HTTP API call failed: {resend_err}")
+
+    # 2. Try Brevo HTTP API (Port 443, safe from cloud port blocks)
+    if brevo_api_key:
+        print(f"📧 EMAIL TRIGGER STARTED (Brevo HTTP API): To={to}, Subject={subject}")
+        from_name, from_email = _parse_from_header(SMTP_FROM)
+        payload = {
+            "sender": {"name": from_name, "email": from_email},
+            "to": [{"email": to}],
+            "subject": subject,
+            "htmlContent": html or body,
+            "textContent": body
+        }
+        if attachment_path and os.path.exists(attachment_path):
+            try:
+                import base64
+                with open(attachment_path, "rb") as f:
+                    file_data = f.read()
+                payload["attachment"] = [
+                    {
+                        "name": os.path.basename(attachment_path),
+                        "content": base64.b64encode(file_data).decode("utf-8")
+                    }
+                ]
+            except Exception as att_err:
+                print(f"⚠️ Brevo attachment encoding failed: {att_err}")
+        
+        try:
+            import urllib.request
+            import json
+            headers = {
+                "api-key": brevo_api_key,
+                "Content-Type": "application/json"
+            }
+            req = urllib.request.Request(
+                "https://api.brevo.com/v3/smtp/email",
+                data=json.dumps(payload).encode("utf-8"),
+                headers=headers,
+                method="POST"
+            )
+            with urllib.request.urlopen(req, timeout=15) as response:
+                res_body = response.read().decode("utf-8")
+                if response.status in [200, 201, 202]:
+                    print(f"✅ EMAIL SENT SUCCESSFULLY (Brevo): To={to}")
+                    await email_collection.update_one(
+                        {"_id": event.get("_id")},
+                        {"$set": {"delivery": "sent", "sent_at": datetime.now(timezone.utc)}},
+                    )
+                    return
+                else:
+                    print(f"⚠️ Brevo API responded with status {response.status}: {res_body}")
+        except Exception as brevo_err:
+            print(f"⚠️ Brevo HTTP API call failed: {brevo_err}")
+
+    # 3. Fall back to SMTP
     if not SMTP_HOST:
-        print(f"⚠️ EMAIL SKIPPED: SMTP_HOST not configured. To: {to}")
+        print(f"⚠️ EMAIL SKIPPED: SMTP_HOST and HTTP APIs not configured. To: {to}")
+        await email_collection.update_one(
+            {"_id": event.get("_id")},
+            {"$set": {"delivery": "not_configured", "error": "SMTP_HOST and HTTP API keys not configured"}},
+        )
         return
+
     msg = EmailMessage()
     msg["From"] = SMTP_FROM
     msg["To"] = to
@@ -99,7 +225,6 @@ async def log_email(to: str, subject: str, body: str, html: str | None = None, a
         msg.add_alternative(html, subtype="html")
 
     if attachment_path:
-        import os
         if os.path.exists(attachment_path):
             import mimetypes
             ctype, encoding = mimetypes.guess_type(attachment_path)
@@ -119,7 +244,8 @@ async def log_email(to: str, subject: str, body: str, html: str | None = None, a
                 print(f"⚠️ ATTACHMENT ERROR for {attachment_path}: {attachment_err}")
         else:
             print(f"⚠️ ATTACHMENT NOT FOUND: {attachment_path}")
-    print(f"📧 EMAIL TRIGGER STARTED: To={to}, Subject={subject}")
+
+    print(f"📧 EMAIL TRIGGER STARTED (SMTP): To={to}, Subject={subject}")
     print(f"   SMTP: host={SMTP_HOST}:{SMTP_PORT}, user={SMTP_USERNAME}, from={SMTP_FROM}")
     try:
         with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as server:
@@ -129,15 +255,15 @@ async def log_email(to: str, subject: str, body: str, html: str | None = None, a
             if SMTP_USERNAME:
                 server.login(SMTP_USERNAME, SMTP_PASSWORD or "")
             server.send_message(msg)
-        print(f"✅ EMAIL SENT SUCCESSFULLY: To={to}")
+        print(f"✅ EMAIL SENT SUCCESSFULLY (SMTP): To={to}")
         await email_collection.update_one(
             {"_id": event.get("_id")},
             {"$set": {"delivery": "sent", "sent_at": datetime.now(timezone.utc)}},
         )
     except Exception as error:
-        print(f"❌ EMAIL FAILED: To={to}, Error={error}")
+        print(f"❌ EMAIL FAILED (SMTP): To={to}, Error={error}")
         await email_collection.update_one(
-            {"to": to, "subject": subject, "created_at": event["created_at"]},
+            {"_id": event.get("_id")},
             {"$set": {"delivery": "failed", "error": str(error)}},
         )
         raise  # Re-raise so callers know email failed

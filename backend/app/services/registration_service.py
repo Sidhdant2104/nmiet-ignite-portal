@@ -52,6 +52,7 @@ class RegistrationService:
         created_at = registration["created_at"]
 
         if background_tasks is not None:
+            # 1. Email to Team Leader
             background_tasks.add_task(
                 self._send_confirmation_email_background,
                 inserted_id=inserted_id,
@@ -68,8 +69,53 @@ class RegistrationService:
                 members=members,
                 mentor=mentor,
                 created_at=created_at,
+                recipient_name=leader.get("name", "Team Leader"),
             )
-            print(f"   ✓ EMAIL TASK QUEUED (background): 0.000s")
+            
+            # 2. Email to other Team Members
+            for member in members:
+                member_email = member.get("email", "")
+                if member_email:
+                    background_tasks.add_task(
+                        self._send_confirmation_email_background,
+                        inserted_id=inserted_id,
+                        registration_id=reg_id,
+                        recipient_email=member_email,
+                        team_name=team.get("teamName", ""),
+                        team_leader=leader.get("name", "Team Leader"),
+                        problem_statement={
+                            "psId": team.get("psId", ""),
+                            "psTitle": team.get("psTitle", ""),
+                            "theme": team.get("theme", ""),
+                            "category": team.get("category", ""),
+                        },
+                        members=members,
+                        mentor=mentor,
+                        created_at=created_at,
+                        recipient_name=member.get("name", "Team Member"),
+                    )
+
+            # 3. Email to Mentor (if provided)
+            if mentor and mentor.get("email"):
+                background_tasks.add_task(
+                    self._send_confirmation_email_background,
+                    inserted_id=inserted_id,
+                    registration_id=reg_id,
+                    recipient_email=mentor.get("email"),
+                    team_name=team.get("teamName", ""),
+                    team_leader=leader.get("name", "Team Leader"),
+                    problem_statement={
+                        "psId": team.get("psId", ""),
+                        "psTitle": team.get("psTitle", ""),
+                        "theme": team.get("theme", ""),
+                        "category": team.get("category", ""),
+                    },
+                    members=members,
+                    mentor=mentor,
+                    created_at=created_at,
+                    recipient_name=mentor.get("name", "Faculty Mentor"),
+                )
+            print(f"   ✓ EMAIL TASKS QUEUED (background): {1 + len(members) + (1 if mentor and mentor.get('email') else 0)} emails")
         else:
             print(f"   ⚠️ No BackgroundTasks — email skipped")
 
@@ -93,6 +139,7 @@ class RegistrationService:
         members: list,
         mentor: dict | None,
         created_at: datetime,
+        recipient_name: str | None = None,
     ):
         """Runs as a FastAPI BackgroundTask — after the HTTP response is already sent."""
         print(f"\n📧 BACKGROUND EMAIL START: {registration_id} → {recipient_email}")
@@ -109,6 +156,7 @@ class RegistrationService:
                 mentor=mentor,
                 registration_id=registration_id,
                 created_at=created_at,
+                recipient_name=recipient_name,
             )
 
             elapsed = time.monotonic() - t0

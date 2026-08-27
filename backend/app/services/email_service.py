@@ -23,6 +23,7 @@ async def send_registration_confirmation_email(
     mentor: dict | None,
     registration_id: str,
     created_at: datetime | None = None,
+    recipient_name: str | None = None,
 ) -> bool:
     """
     Send a professional HTML confirmation email after successful registration.
@@ -37,6 +38,7 @@ async def send_registration_confirmation_email(
 
         # Build plain-text fallback
         plain = _build_plain_text(
+            recipient_name=recipient_name or team_leader,
             team_leader=team_leader,
             team_name=team_name,
             problem_statement=problem_statement,
@@ -48,6 +50,7 @@ async def send_registration_confirmation_email(
 
         # Build HTML body
         html = _build_registration_html(
+            recipient_name=recipient_name or team_leader,
             team_leader=team_leader,
             team_name=team_name,
             problem_statement=problem_statement,
@@ -90,6 +93,7 @@ async def send_registration_confirmation_email(
 # ---------------------------------------------------------------------------
 
 def _build_plain_text(
+    recipient_name: str,
     team_leader: str,
     team_name: str,
     problem_statement: dict,
@@ -113,7 +117,7 @@ def _build_plain_text(
     if created_at:
         date_str = f"\nRegistration Date: {created_at.strftime('%d %b %Y, %I:%M %p')}"
 
-    return f"""Dear {team_leader},
+    return f"""Dear {recipient_name},
 
 Congratulations!
 
@@ -165,6 +169,7 @@ NMIET SIH 2026 Team
 
 
 def _build_registration_html(
+    recipient_name: str,
     team_leader: str,
     team_name: str,
     problem_statement: dict,
@@ -242,7 +247,7 @@ def _build_registration_html(
 
               <!-- Greeting -->
               <p style="margin:0 0 6px;color:#1f2937;font-size:16px;">
-                Dear <strong>{_esc(team_leader)}</strong>,
+                Dear <strong>{_esc(recipient_name)}</strong>,
               </p>
               <p style="margin:0 0 24px;color:#4b5563;font-size:15px;line-height:1.6;">
                 Congratulations! Your team has been successfully registered for the
