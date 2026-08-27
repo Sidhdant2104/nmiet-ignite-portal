@@ -137,6 +137,7 @@ async def log_email(to: str, subject: str, body: str, html: str | None = None, a
             
             try:
                 import urllib.request
+                import urllib.error
                 import json
                 headers = {
                     "Authorization": f"Bearer {resend_api_key}",
@@ -164,6 +165,17 @@ async def log_email(to: str, subject: str, body: str, html: str | None = None, a
                             print("⚠️ Retrying with onboarding@resend.dev...")
                             continue
                         errors.append(err_text)
+            except urllib.error.HTTPError as he:
+                try:
+                    err_body = he.read().decode("utf-8")
+                except Exception:
+                    err_body = ""
+                err_text = f"Resend API HTTPError {he.code}: {err_body or he.reason}"
+                print(f"⚠️ {err_text}")
+                if attempt == 1:
+                    print("⚠️ Retrying with onboarding@resend.dev...")
+                    continue
+                errors.append(err_text)
             except Exception as resend_err:
                 err_text = f"Resend HTTP API call failed: {resend_err}"
                 print(f"⚠️ {err_text}")
@@ -199,6 +211,7 @@ async def log_email(to: str, subject: str, body: str, html: str | None = None, a
         
         try:
             import urllib.request
+            import urllib.error
             import json
             headers = {
                 "api-key": brevo_api_key,
@@ -223,6 +236,14 @@ async def log_email(to: str, subject: str, body: str, html: str | None = None, a
                     err_text = f"Brevo API error status {response.status}: {res_body}"
                     print(f"⚠️ {err_text}")
                     errors.append(err_text)
+        except urllib.error.HTTPError as he:
+            try:
+                err_body = he.read().decode("utf-8")
+            except Exception:
+                err_body = ""
+            err_text = f"Brevo API HTTPError {he.code}: {err_body or he.reason}"
+            print(f"⚠️ {err_text}")
+            errors.append(err_text)
         except Exception as brevo_err:
             err_text = f"Brevo HTTP API call failed: {brevo_err}"
             print(f"⚠️ {err_text}")
