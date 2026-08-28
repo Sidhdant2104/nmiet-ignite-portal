@@ -1,4 +1,13 @@
 const API_URL = import.meta.env.VITE_API_URL || "https://nmiet-sih-backend.onrender.com";
+const ADMIN_TOKEN_STORAGE_KEY = "nmiet_admin_token";
+
+export function clearAdminToken() {
+  window.localStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY);
+}
+
+function adminToken() {
+  return window.localStorage.getItem(ADMIN_TOKEN_STORAGE_KEY);
+}
 export const statuses = ["Registered", "PPT Submitted", "Under Review", "Revision Requested", "Approved", "Shortlisted", "Rejected", "Qualified"] as const;
 export type Status = typeof statuses[number];
 export type AdminUser = { name: string; email: string; role: "super_admin" | "faculty" | "judge" | "iic_member" };
@@ -12,11 +21,33 @@ export type AuditEntry = { _id: string; admin_name: string; action: string; regi
 export type AdminAnnouncement = { _id: string; title: string; body: string; tag?: string; is_pinned?: boolean; is_published?: boolean; is_archived?: boolean; scheduled_for?: string; expires_at?: string };
 export type ManagedAdmin = { _id:string; name:string; email:string; role:string; is_active:boolean; created_at?:string };
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> { const response = await fetch(`${API_URL}/admin${path}`, { credentials: "include", headers: { "Content-Type": "application/json", ...options.headers }, ...options }); if (!response.ok) { const body = await response.json().catch(() => ({})); throw new Error(body.detail || "The request could not be completed."); } return response.status === 204 ? undefined as T : response.json() as Promise<T>; }
-async function requestFile(path: string): Promise<Blob> { const response = await fetch(`${API_URL}/admin${path}`, { credentials: "include" }); if (!response.ok) { const body = await response.json().catch(() => ({})); throw new Error(body.detail || "The export could not be completed."); } return response.blob(); }
+async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const headers = new Headers(options.headers);
+  headers.set("Content-Type", "application/json");
+  const token = adminToken();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+
+  const response = await fetch(`${API_URL}/admin${path}`, { ...options, credentials: "include", headers });
+  if (!response.ok) {
+    if (response.status === 401 && path !== "/auth/login") clearAdminToken();
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body.detail || "The request could not be completed.");
+  }
+  return response.status === 204 ? undefined as T : response.json() as Promise<T>;
+}
+async function requestFile(path: string): Promise<Blob> { const response = await fetch(`${API_URL}/admin${path}`, { credentials: "include", headers: adminToken() ? { Authorization: `Bearer ${adminToken()}` } : undefined }); if (!response.ok) { if (response.status === 401) clearAdminToken(); const body = await response.json().catch(() => ({})); throw new Error(body.detail || "The export could not be completed."); } return response.blob(); }
 const query = (params: Record<string, string | boolean | undefined>) => { const value = new URLSearchParams(); Object.entries(params).forEach(([key, item]) => { if (item !== undefined && item !== "") value.set(key, String(item)); }); return value.toString() ? `?${value}` : ""; };
 export const adminApi = {
-  login: (email: string, password: string) => request<{ user: AdminUser }>("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }), logout: () => request<void>("/auth/logout", { method: "POST" }), me: () => request<AdminUser>("/auth/me"),
+  login: async (email: string, password: string) => {
+    const result = await request<{ token: string; user: AdminUser }>("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
+    window.localStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, result.token);
+    return result.user;
+  },
+  logout: async () => {
+    clearAdminToken();
+    await request<void>("/auth/logout", { method: "POST" });
+  },
+  me: () => request<AdminUser>("/auth/me"),
   dashboard: () => request<{ registration_open:boolean; metrics: Record<string, number>; status_distribution: Record<string, number>; theme_distribution: { theme: string; count: number }[]; latest: AdminRegistration[]; activity: AuditEntry[] }>("/dashboard"),
   registrations: (params: Record<string, string | boolean | undefined> = {}) => request<{ data: AdminRegistration[] }>(`/registrations${query(params)}`), registration: (id: string, includeDeleted = false) => request<AdminRegistration>(`/registrations/${id}${includeDeleted ? "?include_deleted=true" : ""}`), exportRegistrations: (format: "csv" | "xlsx", params: Record<string, string | boolean | undefined>) => requestFile(`/registrations/export${query({ ...params, format })}`), updateRegistration: (id: string, payload: object) => request(`/registrations/${id}`, { method: "PATCH", body: JSON.stringify(payload) }), deleteRegistration: (id: string) => request(`/registrations/${id}`, { method: "DELETE" }), restoreRegistration: (id: string) => request(`/registrations/${id}/restore`, { method: "POST" }),
   activity: () => request<{ data: AuditEntry[] }>("/activity"), announcements: () => request<{ data: AdminAnnouncement[] }>("/announcements"), createAnnouncement: (payload: object) => request<{ id: string }>("/announcements", { method: "POST", body: JSON.stringify(payload) }), updateAnnouncement: (id: string, payload: object) => request(`/announcements/${id}`, { method: "PATCH", body: JSON.stringify(payload) }), deleteAnnouncement: (id: string) => request(`/announcements/${id}`, { method: "DELETE" }),

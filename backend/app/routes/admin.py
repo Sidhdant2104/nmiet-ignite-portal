@@ -12,7 +12,8 @@ import re
 import bcrypt
 import jwt
 from bson import ObjectId
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
+from bson.errors import InvalidId
+from fastapi import APIRouter, Cookie, Depends, Header, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
 from io import BytesIO, StringIO
 import csv
@@ -99,14 +100,26 @@ async def _bootstrap_user():
         user = await admin_users_collection.find_one({"email": email})
     return user
 
-async def current_admin(session: Optional[str] = Cookie(default=None, alias=COOKIE_NAME)):
-    if not session:
+async def current_admin(
+    authorization: Optional[str] = Header(default=None),
+    session: Optional[str] = Cookie(default=None, alias=COOKIE_NAME),
+):
+    # Prefer the explicit Bearer token used by the frontend. The cookie fallback
+    # keeps existing same-site/direct-download admin links working during rollout.
+    if authorization is not None:
+        scheme, _, token = authorization.partition(" ")
+        if scheme.lower() != "bearer" or not token:
+            raise HTTPException(status_code=401, detail="Authentication required.")
+    else:
+        token = session
+    if not token:
         raise HTTPException(status_code=401, detail="Authentication required.")
     try:
-        payload = jwt.decode(session, _secret(), algorithms=["HS256"])
-    except jwt.PyJWTError:
+        payload = jwt.decode(token, _secret(), algorithms=["HS256"])
+        user_id = ObjectId(payload["sub"])
+    except (jwt.PyJWTError, InvalidId, KeyError, TypeError, ValueError):
         raise HTTPException(status_code=401, detail="Session is invalid or expired.")
-    user = await admin_users_collection.find_one({"_id": ObjectId(payload["sub"]), "is_active": {"$ne": False}})
+    user = await admin_users_collection.find_one({"_id": user_id, "is_active": {"$ne": False}})
     if not user:
         raise HTTPException(status_code=401, detail="Session is invalid.")
     user["_id"] = str(user["_id"])
@@ -371,7 +384,7 @@ async def login(data: LoginPayload, response: Response):
     production = os.getenv("ENVIRONMENT") == "production"
     response.set_cookie(COOKIE_NAME, token, httponly=True, secure=production, samesite="none" if production else "lax", max_age=28800, path="/")
     await audit({**user, "_id": str(user["_id"])}, "Signed in")
-    return {"user": {"name": user.get("name", "Administrator"), "email": user["email"], "role": user["role"]}}
+    return {"token": token, "user": {"name": user.get("name", "Administrator"), "email": user["email"], "role": user["role"]}}
 
 @router.post("/auth/logout", status_code=204, dependencies=[Depends(csrf_guard)])
 async def logout(response: Response):
