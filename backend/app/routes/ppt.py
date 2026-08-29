@@ -1,12 +1,13 @@
 """Private PPT submission endpoints. Files never live under a static/public path."""
 from datetime import datetime, timezone, timedelta
 from typing import Optional
+from time import perf_counter
 import smtplib
 from email.message import EmailMessage
 
 import jwt
 from bson import ObjectId
-from fastapi import APIRouter, File, Header, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, Header, HTTPException, UploadFile
 from pydantic import BaseModel, EmailStr
 
 from app.config import (
@@ -347,6 +348,27 @@ async def item_from_upload_token(authorization: Optional[str]):
     return item
 
 
+async def send_ppt_confirmation_email(summary: dict, now: datetime):
+    """Deliver confirmation after the upload response; email errors are non-fatal."""
+    try:
+        await log_email(
+            summary["leader_email"],
+            "PPT Submission Received",
+            (
+                f"Hello {summary['leader_name']},\n\n"
+                f"PPT Submission Received\n"
+                f"Team: {summary['team_name']}\n"
+                f"Reference ID: {summary['reference_id']}\n"
+                f"Upload time: {now:%d %b %Y, %I:%M %p UTC}\n"
+                f"Status: PPT Submitted\n\n"
+                f"The file can be replaced before the submission deadline.\n"
+                f"{PORTAL_URL}/ppt-submission"
+            ),
+        )
+    except Exception as error:
+        print(f"PPT EMAIL FAILED AFTER SUCCESSFUL UPLOAD: {error}")
+
+
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
@@ -376,14 +398,20 @@ async def verify(payload: VerifyPayload):
 
 @router.post("/upload")
 async def upload(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     authorization: Optional[str] = Header(default=None),
 ):
+    started_at = perf_counter()
+    print("PPT UPLOAD START")
+    step_started_at = perf_counter()
     item = await item_from_upload_token(authorization)
+    print(f"PPT AUTHENTICATION: {perf_counter() - step_started_at:.3f}s")
     until = deadline()
     if until and datetime.now(timezone.utc) > until:
         raise HTTPException(403, "The PPT submission deadline has passed.")
 
+    step_started_at = perf_counter()
     # --- Filename + extension ---
     original_filename = (file.filename or "presentation").replace("\\", "/").rsplit("/", 1)[-1]
     ext = f".{original_filename.rsplit('.', 1)[-1].lower()}" if "." in original_filename else ""
@@ -404,6 +432,7 @@ async def upload(
     )
     if not valid:
         raise HTTPException(415, "The file content does not match its extension.")
+    print(f"PPT FILE VALIDATION: {perf_counter() - step_started_at:.3f}s")
 
     # --- Version + previous ---
     now = datetime.now(timezone.utc)
@@ -421,13 +450,16 @@ async def upload(
 
     # --- Upload original ---
     orig_key = original_key(reference_id, version, extension)
+    step_started_at = perf_counter()
     try:
         storage_upload(orig_key, content, content_type)
     except RuntimeError as error:
         raise HTTPException(502, "Storage could not store the presentation.") from error
+    print(f"PPT SUPABASE ORIGINAL UPLOAD: {perf_counter() - step_started_at:.3f}s")
 
     # --- Generate + upload preview PDF ---
     prev_key: Optional[str] = None
+    step_started_at = perf_counter()
     if extension == "pdf":
         # For PDF uploads: preview = same file, but upload separately as preview
         prev_key = preview_key(reference_id, version)
@@ -444,6 +476,7 @@ async def upload(
                 storage_upload(prev_key, pdf_bytes, "application/pdf")
             except RuntimeError:
                 prev_key = None  # Non-fatal
+    print(f"PPT PREVIEW PROCESSING: {perf_counter() - step_started_at:.3f}s")
 
     # --- Push previous into history ---
     if previous:
@@ -470,6 +503,7 @@ async def upload(
         "last_modified": now,
     }
 
+    step_started_at = perf_counter()
     await registration_collection.update_one(
         {"_id": item["_id"]},
         {
@@ -490,28 +524,12 @@ async def upload(
         "detail": f"Version {version}: {original_filename}",
         "timestamp": now,
     })
+    print(f"PPT DATABASE UPDATE: {perf_counter() - step_started_at:.3f}s")
 
     summary = team_summary(item)
-    try:
-         await log_email(
-                summary["leader_email"],
-                "PPT Submission Received",
-                (
-                    f"Hello {summary['leader_name']},\n\n"
-                    f"PPT Submission Received\n"
-                    f"Team: {summary['team_name']}\n"
-                    f"Reference ID: {summary['reference_id']}\n"
-                    f"Upload time: {now:%d %b %Y, %I:%M %p UTC}\n"
-                    f"Status: PPT Submitted\n\n"
-                    f"The file can be replaced before the submission deadline.\n"
-                    f"{PORTAL_URL}/ppt-submission"
-                ),
-            )
-    except Exception as e:
-        print(f"EMAIL FAILED BUT UPLOAD SUCCESSFUL: {e}")
-
-
-   
+    background_tasks.add_task(send_ppt_confirmation_email, summary, now)
+    print("PPT EMAIL QUEUED: 0.000s")
+    print(f"PPT RESPONSE: {perf_counter() - started_at:.3f}s total")
 
     return {
         "success": True,

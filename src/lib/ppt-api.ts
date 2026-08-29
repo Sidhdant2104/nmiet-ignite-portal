@@ -1,6 +1,4 @@
-const API_URL =
-  import.meta.env.VITE_API_URL ||
-  "https://nmiet-sih-backend.onrender.com";
+const API_URL = import.meta.env.VITE_API_URL || "https://nmiet-sih-backend.onrender.com";
 
 async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   try {
@@ -13,9 +11,7 @@ async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     if (!response.ok) {
       const errorBody = await response.json().catch(() => ({}));
 
-      throw new Error(
-        errorBody.detail || `Request failed (${response.status})`
-      );
+      throw new Error(errorBody.detail || `Request failed (${response.status})`);
     }
 
     // Handle empty responses safely
@@ -32,13 +28,11 @@ async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
       console.warn("Invalid JSON response:", text);
       return text as T;
     }
-
   } catch (error) {
     console.error("API ERROR:", error);
     throw error;
   }
 }
-
 
 export type PptSession = {
   id: string;
@@ -59,7 +53,6 @@ export type PptSession = {
   };
 };
 
-
 export type PptUploadResponse = {
   success: boolean;
   version: number;
@@ -67,49 +60,64 @@ export type PptUploadResponse = {
   status: string;
 };
 
+type UploadOptions = {
+  onProgress?: (percentage: number) => void;
+};
 
-export const pptApi = {
-
-  verify: (
-    reference_id: string,
-    leader_email: string
-  ) =>
-    api<PptSession>(
-      "/ppt/verify",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          reference_id,
-          leader_email,
-        }),
-      }
-    ),
-
-
-  upload: (
-    file: File,
-    token: string
-  ) => {
-
+function uploadWithProgress(
+  file: File,
+  token: string,
+  { onProgress }: UploadOptions = {},
+): Promise<PptUploadResponse> {
+  return new Promise((resolve, reject) => {
+    const request = new XMLHttpRequest();
     const data = new FormData();
-
     data.append("file", file);
 
-    return api<PptUploadResponse>(
-      "/ppt/upload",
-      {
-        method: "POST",
+    request.open("POST", `${API_URL}/ppt/upload`);
+    request.setRequestHeader("Authorization", `Bearer ${token}`);
 
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-
-        body: data,
+    request.upload.onprogress = (event) => {
+      if (event.lengthComputable) {
+        onProgress?.(Math.round((event.loaded / event.total) * 100));
       }
-    );
-  },
+    };
 
+    request.onload = () => {
+      let body: Record<string, unknown> = {};
+      try {
+        body = request.responseText ? JSON.parse(request.responseText) : {};
+      } catch {
+        // A successful empty response is handled below; error messages use status.
+      }
+
+      if (request.status >= 200 && request.status < 300) {
+        resolve(body as PptUploadResponse);
+        return;
+      }
+
+      reject(new Error(String(body.detail || `Request failed (${request.status})`)));
+    };
+    request.onerror = () =>
+      reject(new Error("Network error. Please check your connection and try again."));
+    request.onabort = () => reject(new Error("Upload was cancelled."));
+    request.send(data);
+  });
+}
+
+export const pptApi = {
+  verify: (reference_id: string, leader_email: string) =>
+    api<PptSession>("/ppt/verify", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        reference_id,
+        leader_email,
+      }),
+    }),
+
+  upload: (file: File, token: string, options?: UploadOptions) =>
+    uploadWithProgress(file, token, options),
 };

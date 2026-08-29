@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { motion, useScroll, useTransform } from "framer-motion";
-import { ArrowRight, Compass, MapPin, Sparkles } from "lucide-react";
+import { ArrowRight, Compass, FileUp, MapPin, Sparkles } from "lucide-react";
 import { useRef } from "react";
 import { AmbientBackdrop, GridLines } from "@/components/ambient-backdrop";
 import { Counter } from "@/components/motion/counter";
@@ -87,11 +87,39 @@ export function Hero() {
             transition={{ duration: 0.7, delay: 0.45, ease }}
             className="mt-9 flex flex-wrap items-center gap-3"
           >
-            {registrationControl?.is_open !== false ? <Link to="/register" aria-label="Register your team now">
-              <MagneticButton className="bg-primary px-7 py-3.5 text-primary-foreground shadow-glow hover:brightness-105">
-                Register Now <ArrowRight className="h-4 w-4" />
-              </MagneticButton>
-            </Link> : null}
+            {registrationControl?.is_open !== false ? (
+              <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
+                <Link
+                  to="/register"
+                  aria-label="Register your team now"
+                  className="w-full sm:w-auto"
+                >
+                  <MagneticButton className="w-full bg-primary px-7 py-3.5 text-primary-foreground shadow-glow hover:brightness-105 sm:w-auto">
+                    Register Team <ArrowRight className="h-4 w-4" />
+                  </MagneticButton>
+                </Link>
+                <div className="w-full sm:w-auto">
+                  <Link
+                    to="/ppt-submission"
+                    aria-label="Submit your team's PPT"
+                    className="block w-full sm:w-auto"
+                  >
+                    <MagneticButton className="w-full border border-primary/30 bg-card/80 px-7 py-3.5 text-foreground hover:bg-accent sm:w-auto">
+                      <FileUp className="h-4 w-4 text-primary" /> Submit PPT
+                    </MagneticButton>
+                  </Link>
+                  <p className="mt-1.5 text-center text-xs text-muted-foreground sm:text-left">
+                    Already registered? Submit your PPT here.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <Link to="/ppt-submission" aria-label="Submit your team's PPT">
+                <MagneticButton className="border border-primary/30 bg-card/80 px-7 py-3.5 text-foreground hover:bg-accent">
+                  <FileUp className="h-4 w-4 text-primary" /> Submit PPT
+                </MagneticButton>
+              </Link>
+            )}
             <Link to="/problem-statements">
               <MagneticButton className="border border-border bg-card/70 px-7 py-3.5 text-foreground backdrop-blur hover:bg-accent">
                 <Compass className="h-4 w-4 text-brand-blue" /> Explore Problem Statements
@@ -144,9 +172,9 @@ export function Hero() {
           </motion.dl>
         </div>
 
-<motion.div style={{ y: yNear, opacity: fade }} className="relative">
-  <InnovationMap />
-</motion.div>
+        <motion.div style={{ y: yNear, opacity: fade }} className="relative">
+          <InnovationMap />
+        </motion.div>
       </div>
       <div className="shell mt-16">
         <AnnouncementTicker />
