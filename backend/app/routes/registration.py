@@ -2,6 +2,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException
 from app.schemas.update_registration import UpdateRegistration
 from app.schemas.registration import Registration
 from app.services.registration_service import registration_service
+from app.mongodb import settings_collection
 from typing import Optional
 from fastapi import Query
 router = APIRouter(
