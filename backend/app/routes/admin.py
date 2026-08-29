@@ -520,6 +520,7 @@ async def _ppt_file(registration_id: str, user: dict):
     item = await registration_collection.find_one({"_id": object_id, **ppt_scope(user)})
     current = item.get("ppt", {}).get("current") if item else None
     if not current or not ppt_original_key(current): raise HTTPException(404, "PPT submission not found or not permitted.")
+    print(f"ADMIN PPT REQUEST admin authenticated: true ppt id: {registration_id}")
     return item, current
 
 def ppt_version(item: dict, version: Optional[int]) -> dict:
@@ -541,12 +542,13 @@ async def ppt_download(registration_id: str, version: Optional[int] = None, user
     item, _ = await _ppt_file(registration_id, user)
     current = ppt_version(item, version)
     try:
-        signed_url = create_signed_download(ppt_original_key(current), expires_in=60)
+        storage_key = ppt_original_key(current)
+        signed_url = create_signed_download(storage_key, expires_in=60)
     except RuntimeError as error:
         raise HTTPException(502, "Storage could not generate a download link.") from error
+    print(f"ADMIN PPT DOWNLOAD storage path: {storage_key} signed URL generated: true")
     await audit(user, "Faculty downloaded PPT", registration_id, f"Version {current.get('version')}: {current.get('file_name')}")
-    from fastapi.responses import RedirectResponse
-    return RedirectResponse(url=signed_url, status_code=302)
+    return {"url": signed_url, "expires_in": 60}
 
 @router.get("/ppt/{registration_id}/preview")
 async def ppt_preview(registration_id: str, version: Optional[int] = None, user=Depends(require("download_ppt"))):
@@ -558,9 +560,9 @@ async def ppt_preview(registration_id: str, version: Optional[int] = None, user=
         signed_url = create_signed_preview(key, expires_in=60)
     except RuntimeError as error:
         raise HTTPException(502, "Storage could not generate a preview link.") from error
+    print(f"ADMIN PPT PREVIEW storage path: {key} signed URL generated: true")
     await audit(user, "Previewed PPT", registration_id, f"Version {current.get('version')}: {current.get('file_name')}")
-    from fastapi.responses import RedirectResponse
-    return RedirectResponse(url=signed_url, status_code=302)
+    return {"url": signed_url, "expires_in": 60}
 
 @router.patch("/ppt/submissions/{registration_id}", dependencies=[Depends(csrf_guard)])
 async def review_ppt(registration_id: str, payload: PptReviewPayload, user=Depends(require("review_ppt"))):
