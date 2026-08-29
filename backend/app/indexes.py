@@ -1,5 +1,8 @@
 from app.mongodb import (
     announcement_collection,
+    admin_users_collection,
+    audit_collection,
+    problem_collection,
     registration_collection,
     evaluation_track_collection,
     judge_collection,
@@ -31,6 +34,32 @@ async def ensure_index(collection, keys, unique=False, name=None):
 
 
 async def create_indexes():
+
+    await ensure_index(
+        admin_users_collection,
+        "email",
+        unique=True,
+        name="admin_email_unique",
+    )
+
+    await ensure_index(
+        audit_collection,
+        "timestamp",
+        name="audit_timestamp_desc",
+    )
+
+    await ensure_index(
+        problem_collection,
+        "ps_number",
+        unique=True,
+        name="problem_ps_number_unique",
+    )
+
+    await ensure_index(
+        problem_collection,
+        [("theme", 1), ("category", 1)],
+        name="problem_theme_category",
+    )
 
     await ensure_index(
         evaluation_track_collection,
@@ -105,6 +134,18 @@ async def create_indexes():
         "registration_id",
         unique=True,
         name="registration_id_unique",
+    )
+
+    await ensure_index(
+        registration_collection,
+        [("isDeleted", 1), ("created_at", -1)],
+        name="active_registration_created_at",
+    )
+
+    await ensure_index(
+        registration_collection,
+        [("isDeleted", 1), ("ppt.current.uploaded_at", -1)],
+        name="active_ppt_uploaded_at",
     )
 
     await ensure_index(

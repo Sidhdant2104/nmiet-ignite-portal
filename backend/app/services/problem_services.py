@@ -124,9 +124,14 @@ class ProblemService:
         return sorted(unique_map.values())
 
     async def get_problem_by_ps_number(self, ps_number: str):
-        doc = await self.collection.find_one({
-            "ps_number": {"$regex": f"^{re.escape(ps_number.strip())}$", "$options": "i"}
-        })
+        value = ps_number.strip()
+        # The normal path is an indexed exact lookup. Legacy records with a
+        # differently-cased identifier still retain the previous fallback.
+        doc = await self.collection.find_one({"ps_number": value})
+        if not doc:
+            doc = await self.collection.find_one({
+                "ps_number": {"$regex": f"^{re.escape(value)}$", "$options": "i"}
+            })
         return self._serialize(doc) if doc else None
 
     async def search_problems(self, query: str):

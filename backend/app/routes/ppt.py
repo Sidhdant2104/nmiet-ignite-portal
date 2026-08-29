@@ -375,25 +375,37 @@ async def send_ppt_confirmation_email(summary: dict, now: datetime):
 
 @router.post("/verify")
 async def verify(payload: VerifyPayload):
+    started_at = perf_counter()
+    print("PPT VERIFY START")
     item = await registration_collection.find_one(
         {
             "registration_id": payload.reference_id.strip().upper(),
             "leader.email": payload.leader_email.lower(),
             "isDeleted": {"$ne": True},
-        }
+        },
+        {
+            "registration_id": 1,
+            "team": 1,
+            "leader.name": 1,
+            "leader.email": 1,
+            "ppt.current": 1,
+        },
     )
+    print(f"PPT VERIFY MONGO LOOKUP: {perf_counter() - started_at:.3f}s")
     if not item:
         raise HTTPException(404, "No active registration matches that Reference ID and leader email.")
     until = deadline()
     if until and datetime.now(timezone.utc) > until:
         raise HTTPException(403, "The PPT submission deadline has passed.")
     summary = team_summary(item)
-    return {
+    response = {
         **summary,
         "token": upload_token(item),
         "deadline": until,
         "submission": item.get("ppt", {}).get("current"),
     }
+    print(f"PPT VERIFY RESPONSE: {perf_counter() - started_at:.3f}s total")
+    return response
 
 
 @router.post("/upload")

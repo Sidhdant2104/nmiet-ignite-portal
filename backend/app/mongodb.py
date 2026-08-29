@@ -10,7 +10,7 @@ client = AsyncIOMotorClient(
 db = client[DATABASE_NAME]
 
 registration_collection = db["registrations"]
-problem_collection = db["problem_statements"]
+problem_collection = db["problems"]
 theme_collection = db["themes"]
 guideline_collection = db["guidelines"]
 settings_collection = db["settings"]

@@ -6,6 +6,8 @@ environment configuration or written to the database.
 """
 from datetime import datetime, timedelta, timezone
 from typing import Literal, Optional
+from time import perf_counter
+import asyncio
 import os
 import re
 
@@ -13,7 +15,7 @@ import bcrypt
 import jwt
 from bson import ObjectId
 from bson.errors import InvalidId
-from fastapi import APIRouter, Cookie, Depends, Header, HTTPException, Request, Response
+from fastapi import APIRouter, BackgroundTasks, Cookie, Depends, Header, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
 from io import BytesIO, StringIO
 import csv
@@ -104,6 +106,7 @@ async def current_admin(
     authorization: Optional[str] = Header(default=None),
     session: Optional[str] = Cookie(default=None, alias=COOKIE_NAME),
 ):
+    started_at = perf_counter()
     # Prefer the explicit Bearer token used by the frontend. The cookie fallback
     # keeps existing same-site/direct-download admin links working during rollout.
     if authorization is not None:
@@ -119,7 +122,9 @@ async def current_admin(
         user_id = ObjectId(payload["sub"])
     except (jwt.PyJWTError, InvalidId, KeyError, TypeError, ValueError):
         raise HTTPException(status_code=401, detail="Session is invalid or expired.")
+    print(f"ADMIN AUTH TOKEN VERIFY: {perf_counter() - started_at:.3f}s")
     user = await admin_users_collection.find_one({"_id": user_id, "is_active": {"$ne": False}})
+    print(f"ADMIN AUTH MONGO LOOKUP: {perf_counter() - started_at:.3f}s total")
     if not user:
         raise HTTPException(status_code=401, detail="Session is invalid.")
     user["_id"] = str(user["_id"])
@@ -375,15 +380,26 @@ async def export_registrations(format: Literal["csv","xlsx"]="csv", search: Opti
     out=BytesIO(); workbook.save(out); out.seek(0); return StreamingResponse(out,media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",headers={"Content-Disposition":f'attachment; filename="{filename}"'})
 
 @router.post("/auth/login", dependencies=[Depends(csrf_guard)])
-async def login(data: LoginPayload, response: Response):
+async def login(data: LoginPayload, response: Response, background_tasks: BackgroundTasks):
+    started_at = perf_counter()
+    print("ADMIN LOGIN START")
+    step_started_at = perf_counter()
     await _bootstrap_user()
+    print(f"ADMIN LOGIN BOOTSTRAP: {perf_counter() - step_started_at:.3f}s")
+    step_started_at = perf_counter()
     user = await admin_users_collection.find_one({"email": data.email.lower(), "is_active": {"$ne": False}})
+    print(f"ADMIN LOGIN MONGO LOOKUP: {perf_counter() - step_started_at:.3f}s")
+    step_started_at = perf_counter()
     if not user or not bcrypt.checkpw(data.password.encode(), user["password_hash"].encode()):
         raise HTTPException(status_code=401, detail="Invalid email or password.")
+    print(f"ADMIN LOGIN PASSWORD VERIFY: {perf_counter() - step_started_at:.3f}s")
+    step_started_at = perf_counter()
     token = jwt.encode({"sub": str(user["_id"]), "role": user["role"], "exp": datetime.now(timezone.utc) + timedelta(hours=8)}, _secret(), algorithm="HS256")
     production = os.getenv("ENVIRONMENT") == "production"
     response.set_cookie(COOKIE_NAME, token, httponly=True, secure=production, samesite="none" if production else "lax", max_age=28800, path="/")
-    await audit({**user, "_id": str(user["_id"])}, "Signed in")
+    background_tasks.add_task(audit, {**user, "_id": str(user["_id"])}, "Signed in")
+    print(f"ADMIN LOGIN TOKEN AND AUDIT QUEUE: {perf_counter() - step_started_at:.3f}s")
+    print(f"ADMIN LOGIN RESPONSE: {perf_counter() - started_at:.3f}s total")
     return {"token": token, "user": {"name": user.get("name", "Administrator"), "email": user["email"], "role": user["role"]}}
 
 @router.post("/auth/logout", status_code=204, dependencies=[Depends(csrf_guard)])
@@ -392,26 +408,43 @@ async def logout(response: Response):
 
 @router.get("/auth/me")
 async def me(user=Depends(current_admin)):
-    return {"name": user.get("name", "Administrator"), "email": user["email"], "role": user["role"]}
+    started_at = perf_counter()
+    response = {"name": user.get("name", "Administrator"), "email": user["email"], "role": user["role"]}
+    print(f"ADMIN AUTH ME RESPONSE: {perf_counter() - started_at:.3f}s (authentication timed by dependency)")
+    return response
 
 @router.get("/dashboard")
 async def dashboard(user=Depends(current_admin)):
+    started_at = perf_counter()
+    print("ADMIN DASHBOARD START")
     base = {"isDeleted": {"$ne": True}}
-    total = await registration_collection.count_documents(base)
-    async def count(query): return await registration_collection.count_documents({**base, **query})
-    latest = []
-    async for item in registration_collection.find(base).sort("created_at", -1).limit(6):
-        item["_id"] = str(item["_id"]); latest.append(item)
+    dashboard_data, activity, control = await asyncio.gather(
+        registration_collection.aggregate([
+        {"$match": base},
+        {"$facet": {
+            "metrics": [{"$group": {"_id": None, "total": {"$sum": 1}, "software": {"$sum": {"$cond": [{"$eq": ["$team.category", "Software"]}, 1, 0]}}, "hardware": {"$sum": {"$cond": [{"$eq": ["$team.category", "Hardware"]}, 1, 0]}}, "ppt_submitted": {"$sum": {"$cond": [{"$ne": [{"$type": "$ppt.current"}, "missing"]}, 1, 0]}}, "awaiting_ppt": {"$sum": {"$cond": [{"$eq": [{"$type": "$ppt.current"}, "missing"]}, 1, 0]}}, "under_review": {"$sum": {"$cond": [{"$eq": ["$ppt.current.status", "Under Review"]}, 1, 0]}}, "approved": {"$sum": {"$cond": [{"$eq": ["$ppt.current.status", "Approved"]}, 1, 0]}}, "revision_requested": {"$sum": {"$cond": [{"$eq": ["$ppt.current.status", "Revision Requested"]}, 1, 0]}}, "pending_ppt": {"$sum": {"$cond": [{"$eq": ["$status", "Registered"]}, 1, 0]}}, "shortlisted": {"$sum": {"$cond": [{"$eq": ["$status", "Shortlisted"]}, 1, 0]}}, "rejected": {"$sum": {"$cond": [{"$eq": ["$status", "Rejected"]}, 1, 0]}}, "qualified": {"$sum": {"$cond": [{"$eq": ["$status", "Qualified"]}, 1, 0]}}}}],
+            "status_distribution": [{"$group": {"_id": "$status", "count": {"$sum": 1}}}],
+            "theme_distribution": [{"$group": {"_id": "$team.theme", "count": {"$sum": 1}}}, {"$sort": {"count": -1}}, {"$limit": 8}],
+            "latest": [{"$sort": {"created_at": -1}}, {"$limit": 6}, {"$project": {"registration_id": 1, "team.teamName": 1, "status": 1, "created_at": 1}}],
+        }},
+        ]).to_list(length=1),
+        audit_collection.find({}, {"admin_name": 1, "action": 1, "registration_id": 1, "detail": 1, "timestamp": 1}).sort("timestamp", -1).limit(6).to_list(length=6),
+        settings_collection.find_one({"key": "registration_control"}),
+    )
+    print(f"ADMIN DASHBOARD MONGO AGGREGATION: {perf_counter() - started_at:.3f}s")
+    result = dashboard_data[0] if dashboard_data else {}
+    metrics = (result.get("metrics") or [{"total": 0}])[0]
     statuses = ["Registered", "PPT Submitted", "Under Review", "Shortlisted", "Rejected", "Qualified"]
-    status_distribution = {status: await count({"status": status}) for status in statuses}
-    theme_distribution = []
-    async for item in registration_collection.aggregate([{"$match": base}, {"$group": {"_id": "$team.theme", "count": {"$sum": 1}}}, {"$sort": {"count": -1}}, {"$limit": 8}]):
-        theme_distribution.append({"theme": item["_id"] or "Unspecified", "count": item["count"]})
-    activity = []
-    async for item in audit_collection.find().sort("timestamp", -1).limit(6):
-        item["_id"] = str(item["_id"]); activity.append(item)
-    control = await settings_collection.find_one({"key": "registration_control"})
-    return {"registration_open": True if not control else control.get("is_open", True), "metrics": {"total": total, "software": await count({"team.category": "Software"}), "hardware": await count({"team.category": "Hardware"}), "ppt_submitted": await count({"ppt.current": {"$exists": True}}), "awaiting_ppt": await count({"ppt.current": {"$exists": False}}), "under_review": await count({"ppt.current.status": "Under Review"}), "approved": await count({"ppt.current.status": "Approved"}), "revision_requested": await count({"ppt.current.status": "Revision Requested"}), "pending_ppt": await count({"status": "Registered"}), "shortlisted": await count({"status": "Shortlisted"}), "rejected": await count({"status": "Rejected"}), "qualified": await count({"status": "Qualified"})}, "status_distribution": status_distribution, "theme_distribution": theme_distribution, "latest": latest, "activity": activity}
+    status_distribution = {status: 0 for status in statuses}
+    status_distribution.update({item.get("_id") or "Registered": item["count"] for item in result.get("status_distribution", [])})
+    latest = result.get("latest", [])
+    for item in latest:
+        item["_id"] = str(item["_id"])
+    theme_distribution = [{"theme": item["_id"] or "Unspecified", "count": item["count"]} for item in result.get("theme_distribution", [])]
+    for item in activity:
+        item["_id"] = str(item["_id"])
+    print(f"ADMIN DASHBOARD RESPONSE: {perf_counter() - started_at:.3f}s total")
+    return {"registration_open": True if not control else control.get("is_open", True), "metrics": metrics, "status_distribution": status_distribution, "theme_distribution": theme_distribution, "latest": latest, "activity": activity}
 
 @router.get("/registration-control")
 async def get_registration_control(user=Depends(current_admin)):
@@ -429,14 +462,27 @@ async def set_registration_control(payload: RegistrationControlPayload, user=Dep
 @router.get("/ppt/submissions")
 async def ppt_submissions(user=Depends(require("view_ppt"))):
     results = []
-    async for item in registration_collection.find(ppt_scope(user)).sort("ppt.current.uploaded_at", -1): results.append(serialize(item))
+    projection = {
+        "registration_id": 1,
+        "team.teamName": 1,
+        "team.psId": 1,
+        "team.theme": 1,
+        "team.category": 1,
+        "team.college": 1,
+        "leader.name": 1,
+        "leader.email": 1,
+        "leader.college": 1,
+        "mentor.name": 1,
+        "ppt.current": 1,
+    }
+    async for item in registration_collection.find(ppt_scope(user), projection).sort("ppt.current.uploaded_at", -1): results.append(serialize(item))
     return {"data": results}
 
 @router.get("/ppt/themes")
 async def ppt_themes(user=Depends(require("view_ppt"))):
     """Metadata-only theme summary; files are fetched only on review/download."""
     groups: dict[str, dict] = {}
-    async for item in registration_collection.find(ppt_scope(user)):
+    async for item in registration_collection.find(ppt_scope(user), {"team.theme": 1, "ppt.current.status": 1}):
         theme = item.get("team", {}).get("theme") or "Unassigned"
         group = groups.setdefault(theme, {"theme": theme, "total_teams": 0, "ppt_submitted": 0, "pending_review": 0, "approved": 0, "revision_requested": 0, "rejected": 0})
         group["total_teams"] += 1

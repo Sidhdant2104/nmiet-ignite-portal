@@ -1,4 +1,5 @@
 from typing import Optional
+from time import perf_counter
 
 from fastapi import APIRouter, HTTPException, Query
 from app.services.problem_services import problem_service
@@ -16,6 +17,7 @@ async def get_problems(
     category: Optional[str] = Query(None, description="Filter by category (Software/Hardware)"),
     organization: Optional[str] = Query(None, description="Filter by organization"),
 ):
+    started_at = perf_counter()
     problems = await problem_service.get_problems_filtered(
         search=search,
         theme=theme,
@@ -23,6 +25,7 @@ async def get_problems(
         organization=organization,
     )
 
+    print(f"PROBLEM LIST RESPONSE: {perf_counter() - started_at:.3f}s ({len(problems)} results)")
     return {
         "success": True,
         "count": len(problems),
@@ -43,11 +46,13 @@ async def get_unique_themes():
 
 @router.get("/{ps_number}")
 async def get_problem(ps_number: str):
+    started_at = perf_counter()
     problem = await problem_service.get_problem_by_ps_number(ps_number)
 
     if not problem:
         raise HTTPException(status_code=404, detail="Problem statement not found.")
 
+    print(f"PROBLEM DETAIL RESPONSE: {perf_counter() - started_at:.3f}s")
     return {
         "success": True,
         "data": problem

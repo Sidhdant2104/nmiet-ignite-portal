@@ -23,11 +23,6 @@ async def lifespan(app: FastAPI):
 
         await create_indexes()
 
-        # Ensure problem statements have normalized fields and searchable_text
-        from app.services.problem_services import problem_service
-        norm_result = await problem_service.ensure_normalized_data()
-        print(f"✅ Data Normalized: {norm_result.get('normalized', 0)} of {norm_result.get('total', 0)} problem records updated")
-
         print("✅ MongoDB Connected")
         print("✅ Database Indexes Created")
 

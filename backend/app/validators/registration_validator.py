@@ -18,21 +18,28 @@ class RegistrationValidator:
         all_emails = [p["email"] for p in participants]
         all_mobiles = [p["mobile"] for p in participants]
 
-        # Single query for all email duplicates
-        email_cursor = registration_collection.find(
+        # One indexed query checks all e-mail and mobile collisions. This avoids
+        # adding a second Atlas round trip to every registration submission.
+        duplicate_cursor = registration_collection.find(
             {
                 "$or": [
                     {"leader.email": {"$in": all_emails}},
                     {"members.email": {"$in": all_emails}},
+                    {"leader.mobile": {"$in": all_mobiles}},
+                    {"members.mobile": {"$in": all_mobiles}},
                 ]
             },
-            {"leader.email": 1, "members.email": 1}
+            {"leader.email": 1, "members.email": 1, "leader.mobile": 1, "members.mobile": 1}
         )
         existing_emails = set()
-        async for doc in email_cursor:
+        existing_mobiles = set()
+        async for doc in duplicate_cursor:
             existing_emails.add(doc.get("leader", {}).get("email"))
             for m in doc.get("members", []):
                 existing_emails.add(m.get("email"))
+            existing_mobiles.add(doc.get("leader", {}).get("mobile"))
+            for m in doc.get("members", []):
+                existing_mobiles.add(m.get("mobile"))
 
         for index, participant in enumerate(participants):
             if participant["email"] in existing_emails:
@@ -45,22 +52,6 @@ class RegistrationValidator:
                     "field": field,
                     "message": f'{participant["email"]} is already registered.'
                 })
-
-        # Single query for all mobile duplicates
-        mobile_cursor = registration_collection.find(
-            {
-                "$or": [
-                    {"leader.mobile": {"$in": all_mobiles}},
-                    {"members.mobile": {"$in": all_mobiles}},
-                ]
-            },
-            {"leader.mobile": 1, "members.mobile": 1}
-        )
-        existing_mobiles = set()
-        async for doc in mobile_cursor:
-            existing_mobiles.add(doc.get("leader", {}).get("mobile"))
-            for m in doc.get("members", []):
-                existing_mobiles.add(m.get("mobile"))
 
         for index, participant in enumerate(participants):
             if participant["mobile"] in existing_mobiles:
