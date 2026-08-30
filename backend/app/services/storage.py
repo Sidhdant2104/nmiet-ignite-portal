@@ -234,8 +234,10 @@ def create_signed_download(storage_key: str, expires_in: int = 60) -> str:
         url = result.get("signedURL") or result.get("signed_url") or result.get("signedUrl")
         if not url:
             raise ValueError(f"Unexpected signed-URL response: {result}")
+        print("SUPABASE PPT SIGNED URL request result: true")
         return url
     except Exception as exc:
+        print("SUPABASE PPT SIGNED URL request result: false")
         raise RuntimeError(f"Could not create signed download URL: {exc}") from exc
 
 

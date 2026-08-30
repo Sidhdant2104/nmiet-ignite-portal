@@ -224,9 +224,9 @@ export const adminApi = {
     request<{ url: string; expires_in: number }>(
       `/ppt/${id}/download${version ? `?version=${version}` : ""}`,
     ),
-  pptThemeDownloadUrl: (theme: string) =>
-    `${API_URL}/admin/ppt/themes/${encodeURIComponent(theme)}/download`,
-  pptDownloadAllUrl: () => `${API_URL}/admin/ppt/download-all`,
+  pptThemeDownload: (theme: string) =>
+    requestFile(`/ppt/themes/${encodeURIComponent(theme)}/download`),
+  pptDownloadAll: () => requestFile("/ppt/download-all"),
   reviewPpt: (
     id: string,
     payload: { status: PptReviewStatus; reviewer_remarks: string; internal_notes: string },

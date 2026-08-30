@@ -34,6 +34,19 @@ router = APIRouter(prefix="/admin", tags=["Administration"])
 Role = Literal["super_admin", "faculty", "student_spoc", "student_coordinator"]
 COOKIE_NAME = "nmiet_admin_session"
 
+def trace_ppt_request(request: Request, authenticated: bool) -> None:
+    """Temporary safe diagnostics for private PPT access; never logs credentials."""
+    if not request.url.path.startswith("/admin/ppt/"):
+        return
+    parts = request.url.path.rstrip("/").split("/")
+    registration_id = parts[3] if len(parts) > 3 and parts[2] != "themes" else "n/a"
+    print(
+        "PPT VIEW REQUEST "
+        f"endpoint: {request.method} {request.url.path} "
+        f"authenticated admin: {str(authenticated).lower()} "
+        f"PPT/registration ID: {registration_id}"
+    )
+
 ROLE_PERMISSIONS = {
     "super_admin": {"manage_registrations", "delete_registrations", "manage_announcements", "send_email", "manage_users", "export", "view_dashboard", "view_activity", "view_ppt", "review_ppt", "download_ppt", "manage_evaluation"},
     "faculty": {"manage_registrations", "export", "view_dashboard", "view_ppt", "review_ppt", "download_ppt", "manage_evaluation"},
@@ -103,6 +116,7 @@ async def _bootstrap_user():
     return user
 
 async def current_admin(
+    request: Request,
     authorization: Optional[str] = Header(default=None),
     session: Optional[str] = Cookie(default=None, alias=COOKIE_NAME),
 ):
@@ -112,22 +126,27 @@ async def current_admin(
     if authorization is not None:
         scheme, _, token = authorization.partition(" ")
         if scheme.lower() != "bearer" or not token:
+            trace_ppt_request(request, authenticated=False)
             raise HTTPException(status_code=401, detail="Authentication required.")
     else:
         token = session
     if not token:
+        trace_ppt_request(request, authenticated=False)
         raise HTTPException(status_code=401, detail="Authentication required.")
     try:
         payload = jwt.decode(token, _secret(), algorithms=["HS256"])
         user_id = ObjectId(payload["sub"])
     except (jwt.PyJWTError, InvalidId, KeyError, TypeError, ValueError):
+        trace_ppt_request(request, authenticated=False)
         raise HTTPException(status_code=401, detail="Session is invalid or expired.")
     print(f"ADMIN AUTH TOKEN VERIFY: {perf_counter() - started_at:.3f}s")
     user = await admin_users_collection.find_one({"_id": user_id, "is_active": {"$ne": False}})
     print(f"ADMIN AUTH MONGO LOOKUP: {perf_counter() - started_at:.3f}s total")
     if not user:
+        trace_ppt_request(request, authenticated=False)
         raise HTTPException(status_code=401, detail="Session is invalid.")
     user["_id"] = str(user["_id"])
+    trace_ppt_request(request, authenticated=True)
     return user
 
 def require(permission: str):

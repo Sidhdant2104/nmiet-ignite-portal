@@ -63,6 +63,16 @@ function Failure({ error, retry }: { error: Error; retry: () => void }) {
 function Empty({ children }: { children: string }) {
   return <div className="py-14 text-center text-sm text-muted-foreground">{children}</div>;
 }
+function saveDownload(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
 function Status({ value = "Registered" }: { value?: string }) {
   const styles: Record<string, string> = {
     Qualified: "bg-emerald-500/15 text-emerald-700",
@@ -912,6 +922,20 @@ function Ppt() {
       toast.error((error as Error).message);
     }
   };
+  const downloadAll = async () => {
+    try {
+      saveDownload(await adminApi.pptDownloadAll(), "NMIET_SIH_2026_PPT_SUBMISSIONS.zip");
+    } catch (error) {
+      toast.error((error as Error).message);
+    }
+  };
+  const downloadTheme = async (themeName: string) => {
+    try {
+      saveDownload(await adminApi.pptThemeDownload(themeName), `${themeName}.zip`);
+    } catch (error) {
+      toast.error((error as Error).message);
+    }
+  };
   if (data.isLoading || groups.isLoading) return <Loading />;
   if (data.isError || groups.isError)
     return (
@@ -946,9 +970,7 @@ function Ppt() {
   return (
     <>
       <Title kicker="Review workspace" title="PPT Submissions">
-        <a href={adminApi.pptDownloadAllUrl()}>
-          <Button>Download All PPTs</Button>
-        </a>
+        <Button onClick={() => void downloadAll()}>Download All PPTs</Button>
       </Title>
       <p className="-mt-4 mb-6 text-sm text-muted-foreground">
         Review and manage team presentations submitted for NMIET Smart India Hackathon 2026.
@@ -1014,9 +1036,9 @@ function Ppt() {
             <div className="mt-5 flex gap-2">
               <Button onClick={() => setTheme(g.theme)}>Open Theme</Button>
               {g.ppt_submitted ? (
-                <a href={adminApi.pptThemeDownloadUrl(g.theme)}>
-                  <Button variant="outline">Download ZIP</Button>
-                </a>
+                <Button variant="outline" onClick={() => void downloadTheme(g.theme)}>
+                  Download ZIP
+                </Button>
               ) : (
                 <Button variant="outline" disabled>
                   Download ZIP
