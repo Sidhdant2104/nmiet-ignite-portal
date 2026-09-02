@@ -262,6 +262,17 @@ export type Criterion = {
   order: number;
   is_active: boolean;
 };
+export type LeaderboardRow = {
+  rank: number;
+  registration_id: string;
+  reference_id: string;
+  team_name: string;
+  theme: string;
+  domain: string;
+  score: number;
+  max_score: number;
+  judges_count: number;
+};
 const evaluationRequest = <T>(path: string, options: RequestInit = {}) =>
   request<T>(`/evaluation${path}`, options);
 export const evaluationApi = {
@@ -300,4 +311,12 @@ export const evaluationApi = {
     evaluationRequest("/criteria", { method: "POST", body: JSON.stringify(x) }),
   updateCriterion: (id: string, x: Omit<Criterion, "id">) =>
     evaluationRequest(`/criteria/${id}`, { method: "PATCH", body: JSON.stringify(x) }),
+  leaderboard: (params?: { search?: string; domain?: string; track_id?: string }) => {
+    const query = new URLSearchParams();
+    if (params?.search) query.set("search", params.search);
+    if (params?.domain) query.set("domain", params.domain);
+    if (params?.track_id) query.set("track_id", params.track_id);
+    const suffix = query.toString() ? `?${query}` : "";
+    return evaluationRequest<{ data: LeaderboardRow[] }>(`/leaderboard${suffix}`);
+  },
 };

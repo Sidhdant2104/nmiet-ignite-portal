@@ -2,9 +2,9 @@
 from datetime import datetime, timedelta, timezone
 from math import isfinite
 from typing import Optional
-import os, uuid, bcrypt, jwt
+import re, uuid, bcrypt, jwt
 from bson import ObjectId
-from fastapi import APIRouter, Depends, HTTPException, Cookie, Response
+from fastapi import APIRouter, Depends, HTTPException, Cookie, Query, Response
 from pymongo.errors import DuplicateKeyError
 from pydantic import BaseModel, Field
 from app.config import ADMIN_JWT_SECRET
@@ -30,10 +30,32 @@ def secret():
  return ADMIN_JWT_SECRET
 async def active_tracks(): return [x async for x in tracks.find({"is_active":True})]
 def match(reg,track):
- t=reg.get("team",{}); return t.get("theme","").strip().casefold()==track["theme"].strip().casefold() and t.get("category","").strip().casefold()==track["domain"].strip().casefold()
+ t=reg.get("team",{}); return t.get("category","").strip().casefold()==track["domain"].strip().casefold()
 async def teams_for(track): return [r async for r in registrations.find({"isDeleted":{"$ne":True}}) if match(r,track)]
 async def queue_for(track):
  teamdocs=await teams_for(track); ids=[x["registration_id"] for x in teamdocs]; saved=await queues.find_one({"track_id":track["track_id"]}); ordered=[x for x in (saved or {}).get("team_ids",[]) if x in ids]+[x for x in ids if x not in (saved or {}).get("team_ids",[])]; lookup={x["registration_id"]:x for x in teamdocs}; return ordered,lookup
+def public_team(reg):
+ t=reg.get("team",{})
+ return {"registration_id":reg.get("registration_id",""),"reference_id":reg.get("registration_id",""),"team_name":t.get("teamName",""),"ps_id":t.get("psId",""),"problem_statement":t.get("psTitle",""),"theme":t.get("theme",""),"domain":t.get("category","")}
+def evaluation_payload(ev):
+ if not ev: return None
+ return {"id":ev.get("evaluation_id"),"evaluation_id":ev.get("evaluation_id"),"scores":ev.get("scores",{}),"total":ev.get("total_score",0)}
+async def criteria_payload():
+ return [{"id":c["id"],"name":c["name"],"max_marks":c["max_marks"],"description":c.get("description","")} async for c in criteria.find({"is_active":True}).sort("order",1)]
+async def find_registration(reference_id:str):
+ ref=(reference_id or "").strip()
+ if not ref: return None
+ return await registrations.find_one({"isDeleted":{"$ne":True},"registration_id":{"$regex":f"^{re.escape(ref)}$","$options":"i"}})
+async def judge_context(judge_session):
+ d=await auth(judge_session,"judge",judges); t=await tracks.find_one({"track_id":d["track_id"],"is_active":True})
+ if not t: raise HTTPException(403,"This track is inactive.")
+ return d,t
+async def score_total(scores:dict[str,float]):
+ cs={c["id"]:c async for c in criteria.find({"is_active":True})}
+ if not cs: raise HTTPException(409,"Evaluation criteria must be configured before evaluations can begin.")
+ if set(scores)!=set(cs): raise HTTPException(422,"All criteria must be scored.")
+ if any(not isfinite(v) or v<0 or v>cs[k]["max_marks"] for k,v in scores.items()): raise HTTPException(422,"Invalid score.")
+ return sum(scores.values())
 async def auth(cookie,name,collection):
  if not cookie: raise HTTPException(401,"Authentication required.")
  try: p=jwt.decode(cookie,secret(),algorithms=["HS256"]); doc=await collection.find_one({"_id":ObjectId(p["sub"]),"is_active":True})
@@ -183,6 +205,29 @@ async def update_criterion(criterion_id:str,x:CriterionIn,user=Depends(require("
  r=await criteria.update_one({"id":criterion_id},{"$set":{**x.model_dump(),"updated_at":datetime.now(timezone.utc)}})
  if not r.matched_count: raise HTTPException(404,"Criterion not found.")
  return {"success":True}
+@admin.get("/leaderboard")
+async def leaderboard(search:Optional[str]=None,domain:Optional[str]=None,track_id:Optional[str]=None,user=Depends(require("manage_evaluation"))):
+ cs=[c async for c in criteria.find({"is_active":True})]; max_score=sum(c.get("max_marks",0) for c in cs)
+ track=await tracks.find_one({"track_id":track_id}) if track_id else None
+ if track_id and not track: raise HTTPException(404,"Track not found.")
+ grouped={}
+ async for ev in evaluations.find({"status":"submitted"}):
+  grouped.setdefault(ev["registration_id"],[]).append(float(ev.get("total_score") or 0))
+ regs={r["registration_id"]:r async for r in registrations.find({"isDeleted":{"$ne":True},"registration_id":{"$in":list(grouped.keys())}})} if grouped else {}
+ q=(search or "").strip().casefold(); domain_q=(domain or "").strip().casefold(); rows=[]
+ for rid,scores in grouped.items():
+  reg=regs.get(rid)
+  if not reg: continue
+  if track and not match(reg,track): continue
+  team=public_team(reg)
+  if domain_q and team["domain"].strip().casefold()!=domain_q: continue
+  if q:
+   hay=" ".join([team["reference_id"],team["team_name"],team["ps_id"],team["theme"],team["domain"]]).casefold()
+   if q not in hay: continue
+  rows.append({**team,"score":round(sum(scores)/len(scores),2),"max_score":max_score,"judges_count":len(scores)})
+ rows.sort(key=lambda r:(-r["score"],r["team_name"].casefold())); 
+ for i,row in enumerate(rows,1): row["rank"]=i
+ return {"data":rows}
 @judge.get("/tracks")
 @coordinator.get("/tracks")
 async def public_tracks(): return {"data":[{"track_id":x["track_id"],"name":x["name"]} for x in await active_tracks()]}
@@ -218,22 +263,34 @@ async def put_queue(x:QueueIn,coordinator_session:Optional[str]=Cookie(None)):
  ids,_=await queue_for(t)
  if set(x.team_ids)!=set(ids) or len(x.team_ids)!=len(ids): raise HTTPException(422,"Queue must contain this track's teams exactly once.")
  await queues.update_one({"track_id":t["track_id"]},{"$set":{"team_ids":x.team_ids,"updated_at":datetime.now(timezone.utc)}},upsert=True); return {"success":True}
-@judge.get("/current-team")
-async def current_team(judge_session:Optional[str]=Cookie(None)):
- d=await auth(judge_session,"judge",judges); t=await tracks.find_one({"track_id":d["track_id"],"is_active":True})
- if not t: raise HTTPException(403,"This track is inactive.")
- ids,l=await queue_for(t); done=set(await evaluations.distinct("registration_id",{"judge_id":d["id"]})); team=next((i for i in ids if i not in done),None)
- if not team:return {"team":None,"criteria":[]}
- return {"team":{"registration_id":team,"team_name":l[team].get("team",{}).get("teamName",""),"ps_id":l[team].get("team",{}).get("psId",""),"problem_statement":l[team].get("team",{}).get("psTitle",""),"theme":l[team].get("team",{}).get("theme",""),"domain":l[team].get("team",{}).get("category","")},"criteria":[{"id":c["id"],"name":c["name"],"max_marks":c["max_marks"],"description":c.get("description","")} async for c in criteria.find({"is_active":True}).sort("order",1)]}
+@judge.get("/search-team")
+async def search_team(reference_id:str=Query(...),judge_session:Optional[str]=Cookie(None)):
+ d,t=await judge_context(judge_session)
+ reg=await find_registration(reference_id)
+ if not reg: raise HTTPException(404,"No team found for this reference ID.")
+ if not match(reg,t): raise HTTPException(403,"This team does not belong to your assigned track.")
+ ev=await evaluations.find_one({"judge_id":d["id"],"registration_id":reg["registration_id"]})
+ return {"team":public_team(reg),"evaluation":evaluation_payload(ev),"criteria":await criteria_payload()}
 @judge.post("/evaluations",dependencies=[Depends(csrf_guard)])
 async def submit(x:EvalIn,judge_session:Optional[str]=Cookie(None)):
- d=await auth(judge_session,"judge",judges); nowteam=await current_team(judge_session)
- if not nowteam["team"] or nowteam["team"]["registration_id"]!=x.registration_id: raise HTTPException(409,"Only the current queued team can be evaluated.")
- cs={c["id"]:c async for c in criteria.find({"is_active":True})}
- if not cs: raise HTTPException(409,"Evaluation criteria must be configured before evaluations can begin.")
- if set(x.scores)!=set(cs):raise HTTPException(422,"All criteria must be scored.")
- if any(not isfinite(v) or v<0 or v>cs[k]["max_marks"] for k,v in x.scores.items()):raise HTTPException(422,"Invalid score.")
- doc={"evaluation_id":"EVAL-"+uuid.uuid4().hex,"judge_id":d["id"],"judge_name":d["name"],"track_id":d["track_id"],"registration_id":x.registration_id,"scores":x.scores,"total_score":sum(x.scores.values()),"status":"submitted","submitted_at":datetime.now(timezone.utc)}
+ d,t=await judge_context(judge_session)
+ reg=await find_registration(x.registration_id)
+ if not reg: raise HTTPException(404,"No team found for this reference ID.")
+ if not match(reg,t): raise HTTPException(403,"This team does not belong to your assigned track.")
+ total=await score_total(x.scores); now=datetime.now(timezone.utc)
+ doc={"evaluation_id":"EVAL-"+uuid.uuid4().hex,"judge_id":d["id"],"judge_name":d["name"],"track_id":d["track_id"],"registration_id":reg["registration_id"],"reference_id":reg["registration_id"],"scores":x.scores,"total_score":total,"status":"submitted","submitted_at":now,"updated_at":now}
  try: await evaluations.insert_one(doc)
- except DuplicateKeyError: raise HTTPException(409,"Evaluation is already locked.")
- return {"success":True}
+ except DuplicateKeyError: raise HTTPException(409,"Evaluation already exists. Update it instead.")
+ return {"success":True,"evaluation_id":doc["evaluation_id"],"total":total}
+@judge.patch("/evaluations/{evaluation_id}",dependencies=[Depends(csrf_guard)])
+async def update_evaluation(evaluation_id:str,x:EvalIn,judge_session:Optional[str]=Cookie(None)):
+ d,t=await judge_context(judge_session)
+ ev=await evaluations.find_one({"evaluation_id":evaluation_id})
+ if not ev: raise HTTPException(404,"Evaluation not found.")
+ if ev.get("judge_id")!=d["id"]: raise HTTPException(403,"You can only modify your own evaluation.")
+ if x.registration_id and x.registration_id!=ev["registration_id"]: raise HTTPException(422,"Registration ID does not match this evaluation.")
+ reg=await find_registration(ev["registration_id"])
+ if not reg or not match(reg,t): raise HTTPException(403,"This team does not belong to your assigned track.")
+ total=await score_total(x.scores)
+ await evaluations.update_one({"evaluation_id":evaluation_id,"judge_id":d["id"]},{"$set":{"scores":x.scores,"total_score":total,"status":"submitted","updated_at":datetime.now(timezone.utc)}})
+ return {"success":True,"evaluation_id":evaluation_id,"total":total}
