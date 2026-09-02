@@ -1,5 +1,53 @@
-import {useMutation,useQuery,useQueryClient} from "@tanstack/react-query"; import {useNavigate} from "@tanstack/react-router"; import {useState,useEffect} from "react"; import {Button} from "@/components/ui/button"; import {Input} from "@/components/ui/input"; import {evaluationClient as api} from "@/lib/evaluation-client"; import {toast} from "sonner";
-export function Login({role}:{role:"judge"|"coordinator"}){const nav=useNavigate(),tracks=useQuery({queryKey:["public","tracks"],queryFn:api.tracks}),[name,setName]=useState(""),[track,setTrack]=useState(""),[password,setPassword]=useState("");const m=useMutation({mutationFn:()=>role==="judge"?api.judgeLogin(name,track,password):api.coordinatorLogin(name,track,password),onSuccess:()=>nav({to:role==="judge"?"/judge/evaluation":"/track/queue"}),onError:(e:Error)=>toast.error(e.message)});return <main className="mesh-bg flex min-h-dvh items-center justify-center p-4"><form onSubmit={e=>{e.preventDefault();m.mutate()}} className="w-full max-w-md rounded-3xl border bg-card p-8"><h1 className="text-3xl font-bold">{role==="judge"?"Judge":"Track coordinator"} sign in</h1><Input className="mt-6" placeholder="Name" value={name} onChange={e=>setName(e.target.value)}/><select className="mt-3 w-full rounded-xl border bg-background p-3" value={track} onChange={e=>setTrack(e.target.value)}><option value="">Select track</option>{tracks.data?.data.map(t=><option value={t.track_id} key={t.track_id}>{t.name}</option>)}</select><Input className="mt-3" type="password" placeholder="Password" value={password} onChange={e=>setPassword(e.target.value)}/><Button className="mt-5 w-full" disabled={!name||!track||password.length<8||m.isPending}>Sign in</Button></form></main>}
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { JudgePage } from "@/components/judge-panel";
+import { evaluationClient as api } from "@/lib/evaluation-client";
+import { toast } from "sonner";
+
+export function Login({ role }: { role: "judge" | "coordinator" }) {
+  const nav = useNavigate();
+  const tracks = useQuery({ queryKey: ["public", "tracks"], queryFn: api.tracks });
+  const [name, setName] = useState("");
+  const [track, setTrack] = useState("");
+  const [password, setPassword] = useState("");
+  const m = useMutation({
+    mutationFn: () =>
+      role === "judge" ? api.judgeLogin(name, track, password) : api.coordinatorLogin(name, track, password),
+    onSuccess: () => nav({ to: role === "judge" ? "/judge/evaluation" : "/track/queue" }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+  return (
+    <main className="mesh-bg flex min-h-dvh items-center justify-center p-4">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          m.mutate();
+        }}
+        className="w-full max-w-md rounded-3xl border bg-card p-8"
+      >
+        <h1 className="text-3xl font-bold">{role === "judge" ? "Judge" : "Track coordinator"} sign in</h1>
+        <Input className="mt-6" placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
+        <select className="mt-3 w-full rounded-xl border bg-background p-3" value={track} onChange={(e) => setTrack(e.target.value)}>
+          <option value="">Select track</option>
+          {tracks.data?.data.map((t) => (
+            <option value={t.track_id} key={t.track_id}>
+              {t.name}
+              {t.domain ? ` · ${t.domain}` : ""}
+            </option>
+          ))}
+        </select>
+        <Input className="mt-3" type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} />
+        <Button className="mt-5 w-full" disabled={!name || !track || password.length < 8 || m.isPending}>
+          Sign in
+        </Button>
+      </form>
+    </main>
+  );
+}
+
 function scoreValue(raw: string, max: number) {
   if (raw.trim() === "") return 0;
   const value = Number(raw);
@@ -8,6 +56,7 @@ function scoreValue(raw: string, max: number) {
 }
 
 export function JudgeEvaluation() {
+  const me = useQuery({ queryKey: ["judge", "me"], queryFn: api.me, retry: false });
   const [query, setQuery] = useState("");
   const [reference, setReference] = useState("");
   const [scores, setScores] = useState<Record<string, number>>({});
@@ -40,7 +89,7 @@ export function JudgeEvaluation() {
         : api.submit(registrationId, scores);
     },
     onSuccess: async () => {
-      toast.success(team.data?.evaluation ? "Evaluation updated." : "Evaluation saved.");
+      toast.success(team.data?.evaluation ? "Evaluation updated." : "Evaluation submitted successfully");
       setSaved(true);
       setEditing(false);
       await team.refetch();
@@ -75,18 +124,23 @@ export function JudgeEvaluation() {
   });
 
   return (
-    <main className="mx-auto max-w-3xl p-6">
-      <h1 className="text-3xl font-bold">Judge dashboard</h1>
+    <JudgePage>
+      <h1 className="text-3xl font-bold">Evaluation</h1>
+      {me.data && (
+        <p className="mt-2 text-sm text-muted-foreground">
+          Signed in as {me.data.name} · {me.data.track_name} · {me.data.domain}
+        </p>
+      )}
       <section className="mt-5 rounded-2xl border bg-card p-5">
         <h2 className="text-xl font-bold">Search team by reference ID</h2>
         <div className="mt-4 flex flex-col gap-3 sm:flex-row">
           <Input
-            placeholder="SIH2026-0127"
+            placeholder="SIH2026-0210"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && search()}
           />
-          <Button disabled={team.isFetching} onClick={search}>
+          <Button disabled={team.isFetching} onClick={() => search()}>
             {team.isFetching ? "Searching…" : "Search team"}
           </Button>
         </div>
@@ -96,20 +150,35 @@ export function JudgeEvaluation() {
         <>
           <section className="mt-5 grid gap-2 rounded-2xl border bg-card p-5">
             <h2 className="text-xl font-bold">Team details</h2>
-            <b>{t.reference_id} · {t.team_name}</b>
-            <p>PS ID: {t.ps_id}</p>
-            <p>Problem statement: {t.problem_statement}</p>
-            <p>{t.theme} · {t.domain}</p>
+            <p>
+              <span className="text-muted-foreground">Reference ID:</span> {t.reference_id}
+            </p>
+            <p>
+              <span className="text-muted-foreground">PS ID:</span> {t.ps_id}
+            </p>
+            <p>
+              <span className="text-muted-foreground">Problem statement:</span> {t.problem_statement}
+            </p>
+            <p>
+              <span className="text-muted-foreground">Theme:</span> {t.theme}
+            </p>
+            <p>
+              <span className="text-muted-foreground">Domain:</span> {t.domain}
+            </p>
           </section>
           {saved && !editing ? (
             <section className="mt-5 rounded-2xl border bg-card p-5">
-              <p className="font-bold">✓ Evaluation saved</p>
+              <p className="font-bold">Evaluation submitted successfully</p>
               {criteria.map((x) => (
-                <p key={x.id} className="mt-2 text-sm">{x.name}: {scores[x.id] ?? 0} / {x.max_marks}</p>
+                <p key={x.id} className="mt-2 text-sm">
+                  {x.name}: {scores[x.id] ?? 0} / {x.max_marks}
+                </p>
               ))}
               <p className="mt-2">Total score: {total} / {maxTotal}</p>
               <div className="mt-5 flex flex-wrap gap-2">
-                <Button variant="outline" onClick={resetSearch}>← Back</Button>
+                <Button variant="outline" onClick={resetSearch}>
+                  ← Back
+                </Button>
                 <Button onClick={() => setEditing(true)}>Edit evaluation</Button>
               </div>
               <div className="mt-5 border-t pt-5">
@@ -133,6 +202,7 @@ export function JudgeEvaluation() {
                   <span>
                     <span className="font-medium">{x.name}</span>
                     {x.description && <span className="block text-sm text-muted-foreground">{x.description}</span>}
+                    <span className="block text-xs text-muted-foreground">Maximum marks: {x.max_marks}</span>
                   </span>
                   <span className="flex items-center gap-2">
                     <Input
@@ -149,7 +219,9 @@ export function JudgeEvaluation() {
               ))}
               <p className="mt-5 font-bold">Total: {total} / {maxTotal}</p>
               <div className="mt-5 flex flex-wrap gap-2">
-                <Button variant="outline" onClick={resetSearch}>← Back</Button>
+                <Button variant="outline" onClick={resetSearch}>
+                  ← Back
+                </Button>
                 <Button disabled={save.isPending || invalid || !criteria.length} onClick={() => save.mutate()}>
                   {team.data?.evaluation ? "Update evaluation" : "Submit evaluation"}
                 </Button>
@@ -158,7 +230,52 @@ export function JudgeEvaluation() {
           )}
         </>
       )}
+    </JudgePage>
+  );
+}
+
+export function Queue() {
+  const c = useQueryClient();
+  const q = useQuery({ queryKey: ["queue"], queryFn: api.queue, refetchInterval: 4000 });
+  const m = useMutation({
+    mutationFn: (ids: string[]) => api.saveQueue(ids),
+    onSuccess: () => c.invalidateQueries({ queryKey: ["queue"] }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+  if (q.isLoading) return <p className="p-10">Loading queue…</p>;
+  if (q.isError) return <p className="p-10">{q.error.message}</p>;
+  const move = (i: number, d: number) => {
+    const ids = [...q.data!.team_ids];
+    [ids[i], ids[i + d]] = [ids[i + d], ids[i]];
+    m.mutate(ids);
+  };
+  return (
+    <main className="mx-auto max-w-4xl p-6">
+      <h1 className="text-3xl font-bold">{q.data?.track} queue</h1>
+      <div className="mt-6 space-y-3">
+        {q.data?.teams.map((t, i) => (
+          <article className="rounded-2xl border bg-card p-4" key={t.registration_id}>
+            <div className="flex justify-between gap-4">
+              <div>
+                <b>
+                  {i + 1}. {t.registration_id} · {t.team_name}
+                </b>
+                <p className="text-sm">
+                  {t.problem_statement} · {t.ps_id} · {t.theme} · {t.domain}
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" disabled={i === 0 || m.isPending} onClick={() => move(i, -1)}>
+                  Up
+                </Button>
+                <Button size="sm" disabled={i === q.data!.teams.length - 1 || m.isPending} onClick={() => move(i, 1)}>
+                  Down
+                </Button>
+              </div>
+            </div>
+          </article>
+        ))}
+      </div>
     </main>
   );
 }
-export function Queue(){const c=useQueryClient(),q=useQuery({queryKey:["queue"],queryFn:api.queue,refetchInterval:4000}),m=useMutation({mutationFn:(ids:string[])=>api.saveQueue(ids),onSuccess:()=>c.invalidateQueries({queryKey:["queue"]}),onError:(e:Error)=>toast.error(e.message)});if(q.isLoading)return <p className="p-10">Loading queue…</p>;if(q.isError)return <p className="p-10">{q.error.message}</p>;const move=(i:number,d:number)=>{const ids=[...q.data!.team_ids];[ids[i],ids[i+d]]=[ids[i+d],ids[i]];m.mutate(ids)};return <main className="mx-auto max-w-4xl p-6"><h1 className="text-3xl font-bold">{q.data?.track} queue</h1><div className="mt-6 space-y-3">{q.data?.teams.map((t,i)=><article className="rounded-2xl border bg-card p-4" key={t.registration_id}><div className="flex justify-between gap-4"><div><b>{i+1}. {t.registration_id} · {t.team_name}</b><p className="text-sm">{t.problem_statement} · {t.ps_id} · {t.theme} · {t.domain}</p></div><div className="flex gap-2"><Button size="sm" disabled={i===0||m.isPending} onClick={()=>move(i,-1)}>Up</Button><Button size="sm" disabled={i===q.data!.teams.length-1||m.isPending} onClick={()=>move(i,1)}>Down</Button></div></div></article>)}</div></main>}

@@ -2,9 +2,9 @@
 from datetime import datetime, timedelta, timezone
 from math import isfinite
 from typing import Optional
-import re, uuid, bcrypt, jwt
+import os, re, uuid, bcrypt, jwt
 from bson import ObjectId
-from fastapi import APIRouter, Depends, HTTPException, Cookie, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Cookie, Query, Request, Response
 from pymongo.errors import DuplicateKeyError
 from pydantic import BaseModel, Field
 from app.config import ADMIN_JWT_SECRET
@@ -28,6 +28,12 @@ class CriterionIn(BaseModel): name:str=Field(min_length=2); description:str=""; 
 def secret():
  if not ADMIN_JWT_SECRET or len(ADMIN_JWT_SECRET)<32: raise HTTPException(503,"Authentication is not configured.")
  return ADMIN_JWT_SECRET
+def session_cookie_flags(request: Optional[Request]=None):
+ origin=(request.headers.get("origin") if request else "") or ""
+ local=origin.startswith("http://localhost") or origin.startswith("http://127.0.0.1")
+ production=os.getenv("ENVIRONMENT")=="production" or (not local and os.getenv("ENVIRONMENT")!="development")
+ if local: production=False
+ return {"httponly":True,"secure":production,"samesite":"none" if production else "lax","path":"/"}
 async def active_tracks(): return [x async for x in tracks.find({"is_active":True})]
 def match(reg,track):
  t=reg.get("team",{}); return t.get("category","").strip().casefold()==track["domain"].strip().casefold()
@@ -37,6 +43,8 @@ async def queue_for(track):
 def public_team(reg):
  t=reg.get("team",{})
  return {"registration_id":reg.get("registration_id",""),"reference_id":reg.get("registration_id",""),"team_name":t.get("teamName",""),"ps_id":t.get("psId",""),"problem_statement":t.get("psTitle",""),"theme":t.get("theme",""),"domain":t.get("category","")}
+def judge_team(reg):
+ team=public_team(reg); team.pop("team_name",None); return team
 def evaluation_payload(ev):
  if not ev: return None
  return {"id":ev.get("evaluation_id"),"evaluation_id":ev.get("evaluation_id"),"scores":ev.get("scores",{}),"total":ev.get("total_score",0)}
@@ -230,27 +238,22 @@ async def leaderboard(search:Optional[str]=None,domain:Optional[str]=None,track_
  return {"data":rows}
 @judge.get("/tracks")
 @coordinator.get("/tracks")
-async def public_tracks(): return {"data":[{"track_id":x["track_id"],"name":x["name"]} for x in await active_tracks()]}
-async def login(x,coll,cookie,response):
+async def public_tracks(): return {"data":[{"track_id":x["track_id"],"name":x["name"],"domain":x.get("domain","")} for x in await active_tracks()]}
+async def login(x,coll,cookie,response,request):
  d=await coll.find_one({"name":x.name.strip(),"track_id":x.track_id,"is_active":True})
  if not d or not bcrypt.checkpw(x.password.encode(),d["password_hash"].encode()): raise HTTPException(401,"Invalid credentials.")
- response.set_cookie(
-    cookie,
-    jwt.encode(
-        {"sub": str(d["_id"]),
-         "exp": datetime.now(timezone.utc) + timedelta(hours=8)},
-        secret(),
-        algorithm="HS256"
-    ),
-    httponly=True,
-    samesite="none",
-    secure=True,
-    path="/"
-); return {"success":True}
+ response.set_cookie(cookie,jwt.encode({"sub":str(d["_id"]),"exp":datetime.now(timezone.utc)+timedelta(hours=8)},secret(),algorithm="HS256"),max_age=28800,**session_cookie_flags(request)); return {"success":True,"name":d["name"]}
 @judge.post("/auth/login",dependencies=[Depends(csrf_guard)])
-async def judge_login(x:LoginIn,response:Response): return await login(x,judges,"judge_session",response)
+async def judge_login(x:LoginIn,response:Response,request:Request): return await login(x,judges,"judge_session",response,request)
+@judge.get("/auth/me")
+async def judge_me(judge_session:Optional[str]=Cookie(None)):
+ d,t=await judge_context(judge_session)
+ return {"name":d["name"],"judge_id":d["id"],"track_id":t["track_id"],"track_name":t["name"],"domain":t.get("domain",""),"theme":t.get("theme","")}
+@judge.post("/auth/logout",status_code=204,dependencies=[Depends(csrf_guard)])
+async def judge_logout(response:Response,request:Request):
+ response.delete_cookie("judge_session",**session_cookie_flags(request))
 @coordinator.post("/auth/login",dependencies=[Depends(csrf_guard)])
-async def coordinator_login(x:LoginIn,response:Response): return await login(x,coordinators,"coordinator_session",response)
+async def coordinator_login(x:LoginIn,response:Response,request:Request): return await login(x,coordinators,"coordinator_session",response,request)
 @coordinator.get("/queue")
 async def get_queue(coordinator_session:Optional[str]=Cookie(None)):
  d=await auth(coordinator_session,"coordinator",coordinators); t=await tracks.find_one({"track_id":d["track_id"],"is_active":True})
@@ -270,7 +273,7 @@ async def search_team(reference_id:str=Query(...),judge_session:Optional[str]=Co
  if not reg: raise HTTPException(404,"No team found for this reference ID.")
  if not match(reg,t): raise HTTPException(403,"This team does not belong to your assigned track.")
  ev=await evaluations.find_one({"judge_id":d["id"],"registration_id":reg["registration_id"]})
- return {"team":public_team(reg),"evaluation":evaluation_payload(ev),"criteria":await criteria_payload()}
+ return {"team":judge_team(reg),"evaluation":evaluation_payload(ev),"criteria":await criteria_payload()}
 @judge.post("/evaluations",dependencies=[Depends(csrf_guard)])
 async def submit(x:EvalIn,judge_session:Optional[str]=Cookie(None)):
  d,t=await judge_context(judge_session)

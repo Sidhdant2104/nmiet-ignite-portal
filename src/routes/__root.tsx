@@ -159,17 +159,22 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const intro = useIntroAnimation();
-  const isAdmin = useRouterState({ select: (state) => state.location.pathname.startsWith("/admin") });
+  const isPortal = useRouterState({
+    select: (state) => {
+      const path = state.location.pathname;
+      return path.startsWith("/admin") || path.startsWith("/judge") || path.startsWith("/track");
+    },
+  });
 
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        {!isAdmin && <AnimatePresence>{intro.shouldPlay && <IntroAnimation onComplete={intro.complete} />}</AnimatePresence>}
+        {!isPortal && <AnimatePresence>{intro.shouldPlay && <IntroAnimation onComplete={intro.complete} />}</AnimatePresence>}
 
         <div className="flex min-h-dvh flex-col">
-          {!isAdmin && <Navbar />}
+          {!isPortal && <Navbar />}
           <main className="flex-1"><Outlet /></main>
-          {!isAdmin && <Footer />}
+          {!isPortal && <Footer />}
         </div>
 
         <Toaster />

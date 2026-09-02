@@ -1,9 +1,8 @@
-const base = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const base = import.meta.env.VITE_API_URL || "https://nmiet-sih-backend.onrender.com";
 
 export type JudgeTeam = {
   registration_id: string;
   reference_id: string;
-  team_name: string;
   ps_id: string;
   problem_statement: string;
   theme: string;
@@ -30,6 +29,15 @@ export type JudgeTeamSearch = {
   criteria: JudgeCriterion[];
 };
 
+export type JudgeMe = {
+  name: string;
+  judge_id: string;
+  track_id: string;
+  track_name: string;
+  domain: string;
+  theme: string;
+};
+
 async function req<T>(path: string, opt: RequestInit = {}) {
   const r = await fetch(base + path, {
     credentials: "include",
@@ -45,9 +53,11 @@ async function req<T>(path: string, opt: RequestInit = {}) {
 }
 
 export const evaluationClient = {
-  tracks: () => req<{ data: { track_id: string; name: string }[] }>("/judge/tracks"),
+  tracks: () => req<{ data: { track_id: string; name: string; domain?: string }[] }>("/judge/tracks"),
   judgeLogin: (name: string, track_id: string, password: string) =>
     req("/judge/auth/login", { method: "POST", body: JSON.stringify({ name, track_id, password }) }),
+  me: () => req<JudgeMe>("/judge/auth/me"),
+  logout: () => req<void>("/judge/auth/logout", { method: "POST" }),
   searchTeam: (reference_id: string) =>
     req<JudgeTeamSearch>(`/judge/search-team?reference_id=${encodeURIComponent(reference_id)}`),
   submit: (registration_id: string, scores: Record<string, number>) =>
