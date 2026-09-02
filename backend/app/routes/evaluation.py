@@ -8,17 +8,20 @@ from fastapi import APIRouter, Depends, HTTPException, Cookie, Query, Request, R
 from pymongo.errors import DuplicateKeyError
 from pydantic import BaseModel, Field
 from app.config import ADMIN_JWT_SECRET
-from app.mongodb import evaluation_track_collection as tracks, judge_collection as judges, track_coordinator_collection as coordinators, presentation_queue_collection as queues, evaluation_criteria_collection as criteria, evaluation_collection as evaluations, registration_collection as registrations
+from app.mongodb import evaluation_track_collection as tracks, judge_collection as judges, track_coordinator_collection as coordinators, presentation_queue_collection as queues, evaluation_criteria_collection as criteria, evaluation_collection as evaluations, registration_collection as registrations, evaluation_option_collection as options, theme_collection as theme_docs, problem_collection as problems
 from app.routes.admin import require, csrf_guard
 
 admin=APIRouter(prefix="/admin/evaluation",tags=["Evaluation"]); judge=APIRouter(prefix="/judge",tags=["Judge Evaluation"]); coordinator=APIRouter(prefix="/track",tags=["Track Queue"])
 class TrackIn(BaseModel):
     name: str = Field(min_length=2)
     code: str = Field(min_length=1)
-    theme: str = Field(min_length=2)
-    domain: str = Field(min_length=2)
-    judges_required: int = Field(ge=1)
+    themes: list[str] = []
+    domains: list[str] = []
+    theme: Optional[str] = None
+    domain: Optional[str] = None
+    judges_required: int = Field(default=1, ge=1)
     is_active: bool = True
+class LabelIn(BaseModel): kind:str; value:str=Field(min_length=2)
 class AccountIn(BaseModel): name:str=Field(min_length=2); track_id:str; password:str=Field(min_length=8); is_active:bool=True
 class AccountUpdate(BaseModel): name:Optional[str]=Field(None,min_length=2); track_id:Optional[str]=None; password:Optional[str]=Field(None,min_length=8); is_active:Optional[bool]=None
 class LoginIn(BaseModel): name:str; track_id:str; password:str
@@ -35,8 +38,27 @@ def session_cookie_flags(request: Optional[Request]=None):
  if local: production=False
  return {"httponly":True,"secure":production,"samesite":"none" if production else "lax","path":"/"}
 async def active_tracks(): return [x async for x in tracks.find({"is_active":True})]
+def clean_list(values):
+ return [str(v).strip() for v in (values or []) if str(v).strip()]
+def track_themes(track):
+ themes=clean_list(track.get("themes")); one=str(track.get("theme") or "").strip(); return themes or ([one] if one else [])
+def track_domains(track):
+ domains=clean_list(track.get("domains")); one=str(track.get("domain") or "").strip(); return domains or ([one] if one else [])
+def folded(values): return {v.casefold() for v in values}
 def match(reg,track):
- t=reg.get("team",{}); return t.get("category","").strip().casefold()==track["domain"].strip().casefold()
+ t=reg.get("team",{})
+ return t.get("theme","").strip().casefold() in folded(track_themes(track)) and t.get("category","").strip().casefold() in folded(track_domains(track))
+def serialize_track(t, extra=None):
+ themes=track_themes(t); domains=track_domains(t)
+ out={**t,"_id":str(t["_id"]),"themes":themes,"domains":domains,"theme":", ".join(themes),"domain":", ".join(domains)}
+ if extra: out.update(extra)
+ return out
+def track_payload(x:TrackIn):
+ themes=clean_list(x.themes); domains=clean_list(x.domains)
+ if x.theme and x.theme.strip() not in themes: themes.append(x.theme.strip())
+ if x.domain and x.domain.strip() not in domains: domains.append(x.domain.strip())
+ if not themes or not domains: raise HTTPException(422,"Select at least one theme and one domain.")
+ return {"name":x.name.strip(),"code":x.code.strip().upper(),"themes":themes,"domains":domains,"theme":themes[0],"domain":domains[0],"judges_required":x.judges_required,"is_active":x.is_active}
 async def teams_for(track): return [r async for r in registrations.find({"isDeleted":{"$ne":True}}) if match(r,track)]
 async def queue_for(track):
  teamdocs=await teams_for(track); ids=[x["registration_id"] for x in teamdocs]; saved=await queues.find_one({"track_id":track["track_id"]}); ordered=[x for x in (saved or {}).get("team_ids",[]) if x in ids]+[x for x in ids if x not in (saved or {}).get("team_ids",[])]; lookup={x["registration_id"]:x for x in teamdocs}; return ordered,lookup
@@ -76,15 +98,16 @@ async def overview(user=Depends(require("manage_evaluation"))):
 @admin.get("/tracks")
 async def get_tracks(user=Depends(require("manage_evaluation"))):
  out=[]
- async for t in tracks.find().sort("created_at",-1): out.append({**t,"_id":str(t["_id"]),"team_count":len(await teams_for(t))})
+ async for t in tracks.find().sort("created_at",-1): out.append(serialize_track(t,{"team_count":len(await teams_for(t))}))
  return {"data":out}
 @admin.post("/tracks",dependencies=[Depends(csrf_guard)])
 async def create_track(x:TrackIn,user=Depends(require("manage_evaluation"))):
- if await tracks.find_one({"code":x.code.strip().upper()}): raise HTTPException(409,"Track code already exists.")
- now=datetime.now(timezone.utc); doc=x.model_dump(); doc.update({"track_id":"TRACK-"+uuid.uuid4().hex[:8].upper(),"code":x.code.strip().upper(),"created_at":now,"updated_at":now}); r=await tracks.insert_one(doc); return {"id":str(r.inserted_id),"track_id":doc["track_id"]}
+ payload=track_payload(x)
+ if await tracks.find_one({"code":payload["code"]}): raise HTTPException(409,"Track code already exists.")
+ now=datetime.now(timezone.utc); payload.update({"track_id":"TRACK-"+uuid.uuid4().hex[:8].upper(),"created_at":now,"updated_at":now}); r=await tracks.insert_one(payload); return {"id":str(r.inserted_id),"track_id":payload["track_id"]}
 @admin.patch("/tracks/{track_id}",dependencies=[Depends(csrf_guard)])
 async def update_track(track_id:str,x:TrackIn,user=Depends(require("manage_evaluation"))):
- r=await tracks.update_one({"track_id":track_id},{"$set":{**x.model_dump(),"code":x.code.strip().upper(),"updated_at":datetime.now(timezone.utc)}})
+ r=await tracks.update_one({"track_id":track_id},{"$set":{**track_payload(x),"updated_at":datetime.now(timezone.utc)}})
  if not r.matched_count: raise HTTPException(404,"Track not found.")
  return {"success":True}
 @admin.delete("/tracks/{track_id}",dependencies=[Depends(csrf_guard)])
@@ -213,6 +236,27 @@ async def update_criterion(criterion_id:str,x:CriterionIn,user=Depends(require("
  r=await criteria.update_one({"id":criterion_id},{"$set":{**x.model_dump(),"updated_at":datetime.now(timezone.utc)}})
  if not r.matched_count: raise HTTPException(404,"Criterion not found.")
  return {"success":True}
+async def option_values(kind):
+ found=set()
+ async for item in options.find({"kind":kind}): found.add(item["value"])
+ if kind=="theme":
+  found.update([n for n in await theme_docs.distinct("name") if n]); found.update([n for n in await problems.distinct("theme") if n]); found.update([n for n in await registrations.distinct("team.theme") if n])
+  async for t in tracks.find(): found.update(track_themes(t))
+ else:
+  found.update([n for n in await problems.distinct("category") if n]); found.update([n for n in await registrations.distinct("team.category") if n])
+  async for t in tracks.find(): found.update(track_domains(t))
+ return sorted({v.strip() for v in found if str(v).strip()}, key=str.casefold)
+@admin.get("/options")
+async def get_options(user=Depends(require("manage_evaluation"))):
+ return {"themes":await option_values("theme"),"domains":await option_values("domain")}
+@admin.post("/options",dependencies=[Depends(csrf_guard)])
+async def create_option(x:LabelIn,user=Depends(require("manage_evaluation"))):
+ kind=x.kind.strip().casefold()
+ if kind not in {"theme","domain"}: raise HTTPException(422,"Kind must be theme or domain.")
+ value=x.value.strip()
+ try: await options.insert_one({"kind":kind,"value":value,"created_at":datetime.now(timezone.utc)})
+ except DuplicateKeyError: pass
+ return {"success":True,"kind":kind,"value":value}
 @admin.get("/leaderboard")
 async def leaderboard(search:Optional[str]=None,domain:Optional[str]=None,track_id:Optional[str]=None,user=Depends(require("manage_evaluation"))):
  cs=[c async for c in criteria.find({"is_active":True})]; max_score=sum(c.get("max_marks",0) for c in cs)
@@ -238,7 +282,7 @@ async def leaderboard(search:Optional[str]=None,domain:Optional[str]=None,track_
  return {"data":rows}
 @judge.get("/tracks")
 @coordinator.get("/tracks")
-async def public_tracks(): return {"data":[{"track_id":x["track_id"],"name":x["name"],"domain":x.get("domain","")} for x in await active_tracks()]}
+async def public_tracks(): return {"data":[{"track_id":x["track_id"],"name":x["name"],"domain":", ".join(track_domains(x)),"domains":track_domains(x)} for x in await active_tracks()]}
 async def login(x,coll,cookie,response,request):
  d=await coll.find_one({"name":x.name.strip(),"track_id":x.track_id,"is_active":True})
  if not d or not bcrypt.checkpw(x.password.encode(),d["password_hash"].encode()): raise HTTPException(401,"Invalid credentials.")
@@ -248,7 +292,7 @@ async def judge_login(x:LoginIn,response:Response,request:Request): return await
 @judge.get("/auth/me")
 async def judge_me(judge_session:Optional[str]=Cookie(None)):
  d,t=await judge_context(judge_session)
- return {"name":d["name"],"judge_id":d["id"],"track_id":t["track_id"],"track_name":t["name"],"domain":t.get("domain",""),"theme":t.get("theme","")}
+ return {"name":d["name"],"judge_id":d["id"],"track_id":t["track_id"],"track_name":t["name"],"domain":", ".join(track_domains(t)),"theme":", ".join(track_themes(t)),"domains":track_domains(t),"themes":track_themes(t)}
 @judge.post("/auth/logout",status_code=204,dependencies=[Depends(csrf_guard)])
 async def judge_logout(response:Response,request:Request):
  response.delete_cookie("judge_session",**session_cookie_flags(request))
@@ -266,6 +310,14 @@ async def put_queue(x:QueueIn,coordinator_session:Optional[str]=Cookie(None)):
  ids,_=await queue_for(t)
  if set(x.team_ids)!=set(ids) or len(x.team_ids)!=len(ids): raise HTTPException(422,"Queue must contain this track's teams exactly once.")
  await queues.update_one({"track_id":t["track_id"]},{"$set":{"team_ids":x.team_ids,"updated_at":datetime.now(timezone.utc)}},upsert=True); return {"success":True}
+@judge.get("/evaluations")
+async def list_evaluations(judge_session:Optional[str]=Cookie(None)):
+ d,_=await judge_context(judge_session)
+ max_score=sum(c.get("max_marks",0) for c in [c async for c in criteria.find({"is_active":True})])
+ out=[]
+ async for ev in evaluations.find({"judge_id":d["id"],"status":"submitted"}).sort([("updated_at",-1),("submitted_at",-1)]):
+  out.append({"evaluation_id":ev.get("evaluation_id"),"reference_id":ev.get("reference_id") or ev.get("registration_id",""),"total":ev.get("total_score",0),"max_score":max_score})
+ return {"data":out}
 @judge.get("/search-team")
 async def search_team(reference_id:str=Query(...),judge_session:Optional[str]=Cookie(None)):
  d,t=await judge_context(judge_session)

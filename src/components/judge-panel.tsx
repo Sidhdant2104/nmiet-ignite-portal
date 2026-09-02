@@ -7,7 +7,7 @@ import { evaluationClient as api, type JudgeMe } from "@/lib/evaluation-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-export function JudgePage({ children }: { children: ReactNode }) {
+export function JudgePage({ children, sidebar }: { children: ReactNode; sidebar?: ReactNode }) {
   const nav = useNavigate();
   const me = useQuery({ queryKey: ["judge", "me"], queryFn: api.me, retry: false });
 
@@ -39,6 +39,7 @@ export function JudgePage({ children }: { children: ReactNode }) {
             Evaluation
           </Link>
         </nav>
+        <div className="mt-6 min-h-0 flex-1 overflow-y-auto pr-1">{sidebar}</div>
         <JudgeAccount me={me.data} />
       </aside>
       <main className="lg:pl-72">
@@ -51,6 +52,7 @@ export function JudgePage({ children }: { children: ReactNode }) {
           </div>
           <SignOut />
         </header>
+        <div className="border-b p-4 lg:hidden">{sidebar}</div>
         <div className="mx-auto max-w-3xl p-5 lg:p-9">{children}</div>
       </main>
     </div>

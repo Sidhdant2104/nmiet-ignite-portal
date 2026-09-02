@@ -56,7 +56,9 @@ function scoreValue(raw: string, max: number) {
 }
 
 export function JudgeEvaluation() {
+  const queryClient = useQueryClient();
   const me = useQuery({ queryKey: ["judge", "me"], queryFn: api.me, retry: false });
+  const submitted = useQuery({ queryKey: ["judge", "evaluations"], queryFn: api.myEvaluations, retry: false });
   const [query, setQuery] = useState("");
   const [reference, setReference] = useState("");
   const [scores, setScores] = useState<Record<string, number>>({});
@@ -92,7 +94,7 @@ export function JudgeEvaluation() {
       toast.success(team.data?.evaluation ? "Evaluation updated." : "Evaluation submitted successfully");
       setSaved(true);
       setEditing(false);
-      await team.refetch();
+      await Promise.all([team.refetch(), queryClient.invalidateQueries({ queryKey: ["judge", "evaluations"] })]);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -112,6 +114,7 @@ export function JudgeEvaluation() {
     setScores({});
     setSaved(false);
     setEditing(true);
+    window.setTimeout(() => document.getElementById("judge-team-search")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
   };
 
   const t = team.data?.team;
@@ -124,14 +127,35 @@ export function JudgeEvaluation() {
   });
 
   return (
-    <JudgePage>
+    <JudgePage
+      sidebar={
+        <section>
+          <h2 className="text-sm font-semibold">Submitted evaluations</h2>
+          <div className="mt-3 space-y-1">
+            {submitted.data?.data.length ? (
+              submitted.data.data.map((item) => (
+                <button
+                  key={item.evaluation_id || item.reference_id}
+                  className={`w-full rounded-xl px-3 py-2 text-left text-sm ${item.reference_id === reference ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent"}`}
+                  onClick={() => search(item.reference_id)}
+                >
+                  {item.reference_id} • {item.total}/{item.max_score}
+                </button>
+              ))
+            ) : (
+              <p className="px-1 text-xs text-muted-foreground">No evaluations submitted yet.</p>
+            )}
+          </div>
+        </section>
+      }
+    >
       <h1 className="text-3xl font-bold">Evaluation</h1>
       {me.data && (
         <p className="mt-2 text-sm text-muted-foreground">
           Signed in as {me.data.name} · {me.data.track_name} · {me.data.domain}
         </p>
       )}
-      <section className="mt-5 rounded-2xl border bg-card p-5">
+      <section id="judge-team-search" className="mt-5 rounded-2xl border bg-card p-5">
         <h2 className="text-xl font-bold">Search team by reference ID</h2>
         <div className="mt-4 flex flex-col gap-3 sm:flex-row">
           <Input
@@ -180,18 +204,9 @@ export function JudgeEvaluation() {
                   ← Back
                 </Button>
                 <Button onClick={() => setEditing(true)}>Edit evaluation</Button>
-              </div>
-              <div className="mt-5 border-t pt-5">
-                <p className="text-sm font-medium">Search another team</p>
-                <div className="mt-3 flex flex-col gap-3 sm:flex-row">
-                  <Input
-                    placeholder="Reference ID"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && search()}
-                  />
-                  <Button onClick={() => search()}>Search</Button>
-                </div>
+                <Button variant="outline" onClick={resetSearch}>
+                  Search new team
+                </Button>
               </div>
             </section>
           ) : (

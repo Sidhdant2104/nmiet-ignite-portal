@@ -9,6 +9,7 @@ from app.mongodb import (
     track_coordinator_collection,
     presentation_queue_collection,
     evaluation_collection,
+    evaluation_option_collection,
 )
 
 
@@ -101,6 +102,13 @@ async def create_indexes():
         [("judge_id", 1), ("registration_id", 1)],
         unique=True,
         name="judge_team_unique_evaluation",
+    )
+
+    await ensure_index(
+        evaluation_option_collection,
+        [("kind", 1), ("value", 1)],
+        unique=True,
+        name="evaluation_option_kind_value_unique",
     )
 
     await ensure_index(

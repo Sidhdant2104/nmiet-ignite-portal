@@ -58,6 +58,10 @@ export const evaluationClient = {
     req("/judge/auth/login", { method: "POST", body: JSON.stringify({ name, track_id, password }) }),
   me: () => req<JudgeMe>("/judge/auth/me"),
   logout: () => req<void>("/judge/auth/logout", { method: "POST" }),
+  myEvaluations: () =>
+    req<{ data: { evaluation_id: string; reference_id: string; total: number; max_score: number }[] }>(
+      "/judge/evaluations",
+    ),
   searchTeam: (reference_id: string) =>
     req<JudgeTeamSearch>(`/judge/search-team?reference_id=${encodeURIComponent(reference_id)}`),
   submit: (registration_id: string, scores: Record<string, number>) =>

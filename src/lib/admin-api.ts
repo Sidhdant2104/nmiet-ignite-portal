@@ -249,6 +249,8 @@ export type EvaluationTrack = {
   code: string;
   theme: string;
   domain: string;
+  themes?: string[];
+  domains?: string[];
   judges_required: number;
   is_active: boolean;
   team_count?: number;
@@ -287,6 +289,9 @@ export const evaluationApi = {
       progress_percentage: number;
     }>("/overview"),
   tracks: () => evaluationRequest<{ data: EvaluationTrack[] }>("/tracks"),
+  options: () => evaluationRequest<{ themes: string[]; domains: string[] }>("/options"),
+  createOption: (kind: "theme" | "domain", value: string) =>
+    evaluationRequest("/options", { method: "POST", body: JSON.stringify({ kind, value }) }),
   createTrack: (x: Omit<EvaluationTrack, "track_id" | "team_count">) =>
     evaluationRequest("/tracks", { method: "POST", body: JSON.stringify(x) }),
   updateTrack: (id: string, x: Omit<EvaluationTrack, "track_id" | "team_count">) =>
