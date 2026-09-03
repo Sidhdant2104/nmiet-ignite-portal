@@ -7,6 +7,7 @@ import {
   type Criterion,
   type EvaluationAccount,
   type EvaluationTrack,
+  type LeaderboardRow,
 } from "@/lib/admin-api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -349,6 +350,71 @@ export function Criteria() {
   );
 }
 
+function groupLeaderboard(rows: LeaderboardRow[]) {
+  const groups: { trackId: string; trackName: string; rows: LeaderboardRow[] }[] = [];
+  const index = new Map<string, number>();
+  for (const row of rows) {
+    const key = row.track_id || row.track_name;
+    const existing = index.get(key);
+    if (existing === undefined) {
+      index.set(key, groups.length);
+      groups.push({ trackId: row.track_id, trackName: row.track_name || "Track", rows: [row] });
+    } else {
+      groups[existing].rows.push(row);
+    }
+  }
+  return groups;
+}
+
+function LeaderboardTable({ rows, loading }: { rows: LeaderboardRow[]; loading: boolean }) {
+  return (
+    <div className="overflow-x-auto rounded-2xl border bg-card">
+      <table className="w-full text-left text-sm">
+        <thead className="border-b text-muted-foreground">
+          <tr>
+            <th className="p-4">Rank</th>
+            <th className="p-4">Team</th>
+            <th className="p-4">Reference ID</th>
+            <th className="p-4">Domain</th>
+            <th className="p-4">Judges</th>
+            <th className="p-4">Combined score</th>
+          </tr>
+        </thead>
+        <tbody>
+          {loading ? (
+            <tr>
+              <td className="p-4 text-muted-foreground" colSpan={6}>
+                Loading leaderboard…
+              </td>
+            </tr>
+          ) : rows.length ? (
+            rows.map((row) => (
+              <tr className="border-b last:border-0" key={`${row.track_id}-${row.registration_id}`}>
+                <td className="p-4 font-bold">{row.rank}</td>
+                <td className="p-4">{row.team_name}</td>
+                <td className="p-4 font-mono">{row.reference_id}</td>
+                <td className="p-4">{row.domain}</td>
+                <td className="p-4">
+                  {row.judges_count}/{row.judges_required}
+                </td>
+                <td className="p-4 font-semibold">
+                  {row.score} / {row.max_score}
+                </td>
+              </tr>
+            ))
+          ) : (
+            <tr>
+              <td className="p-4 text-muted-foreground" colSpan={6}>
+                No evaluations yet.
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export function Leaderboard() {
   const tracks = useQuery({ queryKey: ["eval", "tracks"], queryFn: evaluationApi.tracks });
   const [search, setSearch] = useState("");
@@ -373,10 +439,14 @@ export function Leaderboard() {
       (tracks.data?.data || []).flatMap((t) => (t.domains?.length ? t.domains : t.domain ? t.domain.split(", ") : [])).filter(Boolean),
     ),
   ];
+  const groups = groupLeaderboard(q.data?.data || []);
   if (q.isError) return wrap(<p>{q.error.message}</p>);
   return wrap(
     <>
       <h1 className="text-3xl font-bold">Leaderboard</h1>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Rankings are track-wise. Each team score is the sum of every judge in that track.
+      </p>
       <section className="mt-6 grid gap-3 rounded-2xl border bg-card p-5 md:grid-cols-3">
         <Input placeholder="Search team or reference ID" value={search} onChange={(e) => setSearch(e.target.value)} />
         <select className="rounded-xl border bg-background px-3" value={domain} onChange={(e) => setDomain(e.target.value)}>
@@ -396,46 +466,24 @@ export function Leaderboard() {
           ))}
         </select>
       </section>
-      <div className="mt-6 overflow-x-auto rounded-2xl border bg-card">
-        <table className="w-full text-left text-sm">
-          <thead className="border-b text-muted-foreground">
-            <tr>
-              <th className="p-4">Rank</th>
-              <th className="p-4">Team</th>
-              <th className="p-4">Reference ID</th>
-              <th className="p-4">Domain</th>
-              <th className="p-4">Score</th>
-            </tr>
-          </thead>
-          <tbody>
-            {q.isLoading ? (
-              <tr>
-                <td className="p-4 text-muted-foreground" colSpan={5}>
-                  Loading leaderboard…
-                </td>
-              </tr>
-            ) : q.data?.data.length ? (
-              q.data.data.map((row) => (
-                <tr className="border-b last:border-0" key={row.registration_id}>
-                  <td className="p-4 font-bold">{row.rank}</td>
-                  <td className="p-4">{row.team_name}</td>
-                  <td className="p-4 font-mono">{row.reference_id}</td>
-                  <td className="p-4">{row.domain}</td>
-                  <td className="p-4">
-                    {row.score} / {row.max_score}
-                  </td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td className="p-4 text-muted-foreground" colSpan={5}>
-                  No evaluations yet.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      {q.isLoading ? (
+        <div className="mt-6">
+          <LeaderboardTable rows={[]} loading />
+        </div>
+      ) : groups.length ? (
+        <div className="mt-6 space-y-8">
+          {groups.map((group) => (
+            <section key={group.trackId}>
+              <h2 className="mb-3 text-lg font-semibold">{group.trackName}</h2>
+              <LeaderboardTable rows={group.rows} loading={false} />
+            </section>
+          ))}
+        </div>
+      ) : (
+        <div className="mt-6">
+          <LeaderboardTable rows={[]} loading={false} />
+        </div>
+      )}
     </>,
   );
 }

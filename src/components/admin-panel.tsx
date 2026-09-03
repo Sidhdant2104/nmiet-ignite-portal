@@ -911,6 +911,7 @@ function Ppt() {
     [status, setStatus] = useState("");
   const data = useQuery({ queryKey: ["admin", "ppt"], queryFn: adminApi.pptSubmissions });
   const groups = useQuery({ queryKey: ["admin", "ppt", "themes"], queryFn: adminApi.pptThemes });
+  const [busy, setBusy] = useState("");
   const viewPpt = async (id: string) => {
     const tab = window.open("", "_blank");
     try {
@@ -923,17 +924,23 @@ function Ppt() {
     }
   };
   const downloadAll = async () => {
+    setBusy("all");
     try {
       saveDownload(await adminApi.pptDownloadAll(), "NMIET_SIH_2026_PPT_SUBMISSIONS.zip");
     } catch (error) {
       toast.error((error as Error).message);
+    } finally {
+      setBusy("");
     }
   };
   const downloadTheme = async (themeName: string) => {
+    setBusy(themeName);
     try {
       saveDownload(await adminApi.pptThemeDownload(themeName), `${themeName}.zip`);
     } catch (error) {
       toast.error((error as Error).message);
+    } finally {
+      setBusy("");
     }
   };
   if (data.isLoading || groups.isLoading) return <Loading />;
@@ -970,7 +977,9 @@ function Ppt() {
   return (
     <>
       <Title kicker="Review workspace" title="PPT Submissions">
-        <Button onClick={() => void downloadAll()}>Download All PPTs</Button>
+        <Button disabled={!!busy} onClick={() => void downloadAll()}>
+          {busy === "all" ? "Preparing ZIP…" : "Download All PPTs"}
+        </Button>
       </Title>
       <p className="-mt-4 mb-6 text-sm text-muted-foreground">
         Review and manage team presentations submitted for NMIET Smart India Hackathon 2026.
@@ -1036,8 +1045,12 @@ function Ppt() {
             <div className="mt-5 flex gap-2">
               <Button onClick={() => setTheme(g.theme)}>Open Theme</Button>
               {g.ppt_submitted ? (
-                <Button variant="outline" onClick={() => void downloadTheme(g.theme)}>
-                  Download ZIP
+                <Button
+                  variant="outline"
+                  disabled={!!busy}
+                  onClick={() => void downloadTheme(g.theme)}
+                >
+                  {busy === g.theme ? "Preparing ZIP…" : "Download ZIP"}
                 </Button>
               ) : (
                 <Button variant="outline" disabled>

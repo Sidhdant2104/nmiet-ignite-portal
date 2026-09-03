@@ -259,26 +259,36 @@ async def create_option(x:LabelIn,user=Depends(require("manage_evaluation"))):
  return {"success":True,"kind":kind,"value":value}
 @admin.get("/leaderboard")
 async def leaderboard(search:Optional[str]=None,domain:Optional[str]=None,track_id:Optional[str]=None,user=Depends(require("manage_evaluation"))):
- cs=[c async for c in criteria.find({"is_active":True})]; max_score=sum(c.get("max_marks",0) for c in cs)
- track=await tracks.find_one({"track_id":track_id}) if track_id else None
- if track_id and not track: raise HTTPException(404,"Track not found.")
+ cs=[c async for c in criteria.find({"is_active":True})]; criterion_max=sum(c.get("max_marks",0) for c in cs)
+ track_docs={t["track_id"]:t async for t in tracks.find()}
+ if track_id and track_id not in track_docs: raise HTTPException(404,"Track not found.")
+ query={"status":"submitted"}
+ if track_id: query["track_id"]=track_id
  grouped={}
- async for ev in evaluations.find({"status":"submitted"}):
-  grouped.setdefault(ev["registration_id"],[]).append(float(ev.get("total_score") or 0))
- regs={r["registration_id"]:r async for r in registrations.find({"isDeleted":{"$ne":True},"registration_id":{"$in":list(grouped.keys())}})} if grouped else {}
- q=(search or "").strip().casefold(); domain_q=(domain or "").strip().casefold(); rows=[]
- for rid,scores in grouped.items():
-  reg=regs.get(rid)
-  if not reg: continue
-  if track and not match(reg,track): continue
+ async for ev in evaluations.find(query):
+  tid=ev.get("track_id")
+  rid=ev.get("registration_id")
+  if not tid or not rid: continue
+  grouped.setdefault((tid,rid),[]).append(float(ev.get("total_score") or 0))
+ rids=list({rid for _,rid in grouped})
+ regs={r["registration_id"]:r async for r in registrations.find({"isDeleted":{"$ne":True},"registration_id":{"$in":rids}})} if rids else {}
+ by_track={}
+ for (tid,rid),scores in grouped.items():
+  track=track_docs.get(tid); reg=regs.get(rid)
+  if not track or not reg: continue
   team=public_team(reg)
-  if domain_q and team["domain"].strip().casefold()!=domain_q: continue
-  if q:
-   hay=" ".join([team["reference_id"],team["team_name"],team["ps_id"],team["theme"],team["domain"]]).casefold()
-   if q not in hay: continue
-  rows.append({**team,"score":round(sum(scores)/len(scores),2),"max_score":max_score,"judges_count":len(scores)})
- rows.sort(key=lambda r:(-r["score"],r["team_name"].casefold())); 
- for i,row in enumerate(rows,1): row["rank"]=i
+  judges_required=int(track.get("judges_required") or len(scores) or 1)
+  by_track.setdefault(tid,[]).append({**team,"track_id":tid,"track_name":track.get("name",""),"score":round(sum(scores),2),"max_score":criterion_max*judges_required,"judges_count":len(scores),"judges_required":judges_required})
+ rows=[]
+ for tid,track_rows in by_track.items():
+  track_rows.sort(key=lambda r:(-r["score"],r["team_name"].casefold()))
+  for i,row in enumerate(track_rows,1): row["rank"]=i
+  rows.extend(track_rows)
+ q=(search or "").strip().casefold(); domain_q=(domain or "").strip().casefold()
+ if domain_q: rows=[r for r in rows if r["domain"].strip().casefold()==domain_q]
+ if q:
+  rows=[r for r in rows if q in " ".join([r["reference_id"],r["team_name"],r["ps_id"],r["theme"],r["domain"],r["track_name"]]).casefold()]
+ rows.sort(key=lambda r:(r["track_name"].casefold(),r["rank"]))
  return {"data":rows}
 @judge.get("/tracks")
 @coordinator.get("/tracks")

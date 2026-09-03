@@ -29,8 +29,11 @@ from supabase import create_client, Client
 from app.config import SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_BUCKET
 
 # ---------------------------------------------------------------------------
-# Client — initialised once at import time
+# Client — created on first use so a missing storage config cannot take down login
 # ---------------------------------------------------------------------------
+
+_client: Optional[Client] = None
+
 
 def _make_client() -> Client:
     if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
@@ -40,7 +43,11 @@ def _make_client() -> Client:
     return create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
 
-_client: Client = _make_client()
+def _get_client() -> Client:
+    global _client
+    if _client is None:
+        _client = _make_client()
+    return _client
 
 
 # ---------------------------------------------------------------------------
@@ -51,7 +58,7 @@ def _bucket():
     """Return the storage bucket handle, raising clearly if unconfigured."""
     if not SUPABASE_BUCKET:
         raise RuntimeError("SUPABASE_BUCKET must be set in the environment.")
-    return _client.storage.from_(SUPABASE_BUCKET)
+    return _get_client().storage.from_(SUPABASE_BUCKET)
 
 
 # ---------------------------------------------------------------------------
@@ -234,6 +241,8 @@ def create_signed_download(storage_key: str, expires_in: int = 60) -> str:
         url = result.get("signedURL") or result.get("signed_url") or result.get("signedUrl")
         if not url:
             raise ValueError(f"Unexpected signed-URL response: {result}")
+        if url.startswith("/"):
+            url = f"{(SUPABASE_URL or '').rstrip('/')}{url}"
         print("SUPABASE PPT SIGNED URL request result: true")
         return url
     except Exception as exc:

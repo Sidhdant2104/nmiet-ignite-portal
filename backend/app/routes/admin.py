@@ -27,8 +27,7 @@ from app.config import ADMIN_BOOTSTRAP_EMAIL, ADMIN_BOOTSTRAP_PASSWORD_HASH, ADM
 from copy import deepcopy
 from app.mongodb import admin_users_collection, announcement_collection, audit_collection, registration_collection, settings_collection
 from app.routes.ppt import STATUS as PPT_STATUSES, log_email
-from app.services.storage import create_signed_download, create_signed_preview, download_file as storage_download
-from zipfile import ZIP_DEFLATED, ZipFile
+from app.services.storage import create_signed_download, create_signed_preview
 
 router = APIRouter(prefix="/admin", tags=["Administration"])
 Role = Literal["super_admin", "faculty", "student_spoc", "student_coordinator"]
@@ -211,31 +210,38 @@ def zip_name(value: str, fallback: str) -> str:
     cleaned = re.sub(r"[^A-Za-z0-9._ -]+", "_", value or "").strip(" .")
     return cleaned or fallback
 
-async def stream_ppt_zip(items: list[dict], filename: str, user: dict, root: Optional[str] = None):
-    """Build an admin-only archive from private storage without leaking object keys."""
-    output = BytesIO()
-    try:
-        with ZipFile(output, "w", ZIP_DEFLATED) as archive:
-            for item in items:
-                current = item.get("ppt", {}).get("current") or {}
-                key = ppt_original_key(current)
-                if not key:
-                    continue
-                try:
-                    content = storage_download(key)
-                except RuntimeError:
-                    # One unavailable object should not prevent recovery of every other submission.
-                    continue
-                team = zip_name(item.get("team", {}).get("teamName", ""), "Untitled Team")
-                theme = zip_name(item.get("team", {}).get("theme", ""), "Unassigned")
-                name = zip_name(upload_filename(current), "presentation")
-                prefix = f"{root}/" if root else ""
-                archive.writestr(f"{prefix}{theme}/{team}/{name}", content)
-    except RuntimeError as error:
-        raise HTTPException(502, "Unable to retrieve presentation. Please try again.") from error
-    output.seek(0)
-    await audit(user, "Downloaded PPT ZIP", detail=filename)
-    return StreamingResponse(output, media_type="application/zip", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+def ppt_archive_path(item: dict, root: Optional[str] = None) -> Optional[tuple[str, str]]:
+    current = item.get("ppt", {}).get("current") or {}
+    key = ppt_original_key(current)
+    if not key:
+        return None
+    team = zip_name(item.get("team", {}).get("teamName", ""), "Untitled Team")
+    theme = zip_name(item.get("team", {}).get("theme", ""), "Unassigned")
+    name = zip_name(upload_filename(current), "presentation")
+    prefix = f"{root}/" if root else ""
+    return f"{prefix}{theme}/{team}/{name}", key
+
+async def ppt_download_manifest(items: list[dict], filename: str, user: dict, root: Optional[str] = None):
+    """Return short-lived signed URLs so the browser can assemble the ZIP.
+
+    Building the archive on Render downloads every file in one request and is
+    killed by the platform proxy (502) once the payload or runtime grows.
+    """
+    files = []
+    for item in items:
+        entry = ppt_archive_path(item, root)
+        if not entry:
+            continue
+        path, key = entry
+        try:
+            url = await asyncio.to_thread(create_signed_download, key, 600)
+        except RuntimeError:
+            continue
+        files.append({"path": path, "url": url})
+    if not files:
+        raise HTTPException(404, "No PPT submissions are available to download.")
+    await audit(user, "Prepared PPT ZIP download", detail=filename)
+    return {"filename": filename, "files": files}
 
 def registration_query(search: Optional[str] = None, status: Optional[str] = None, theme: Optional[str] = None, category: Optional[str] = None, date_from: Optional[datetime] = None, date_to: Optional[datetime] = None, include_deleted: bool = False):
     query = {} if include_deleted else {"isDeleted": {"$ne": True}}
@@ -525,7 +531,7 @@ async def download_theme_ppts(theme: str, user=Depends(require("download_ppt")))
     query = {**ppt_scope(user), **theme_query, "ppt.current": {"$exists": True}}
     async for item in registration_collection.find(query):
         if ppt_original_key(item.get("ppt", {}).get("current") or {}): items.append(item)
-    return await stream_ppt_zip(items, f"{zip_name(theme, 'Unassigned')}.zip", user)
+    return await ppt_download_manifest(items, f"{zip_name(theme, 'Unassigned')}.zip", user)
 
 @router.get("/ppt/download-all")
 async def download_all_ppts(user=Depends(require("download_ppt"))):
@@ -533,7 +539,7 @@ async def download_all_ppts(user=Depends(require("download_ppt"))):
     query = {**ppt_scope(user), "ppt.current": {"$exists": True}}
     async for item in registration_collection.find(query):
         if ppt_original_key(item.get("ppt", {}).get("current") or {}): items.append(item)
-    return await stream_ppt_zip(items, "NMIET_SIH_2026_PPT_SUBMISSIONS.zip", user, "NMIET_SIH_2026_PPT_SUBMISSIONS")
+    return await ppt_download_manifest(items, "NMIET_SIH_2026_PPT_SUBMISSIONS.zip", user, "NMIET_SIH_2026_PPT_SUBMISSIONS")
 
 async def _ppt_file(registration_id: str, user: dict):
     try: object_id = ObjectId(registration_id)

@@ -121,6 +121,17 @@ export type ManagedAdmin = {
   created_at?: string;
 };
 
+function unavailableMessage() {
+  return "The admin API is unavailable (Render returned 502/503). Open the Render dashboard, confirm nmiet-sih-backend is Live, then try again. Hibernated free instances often fail to wake.";
+}
+
+function detailMessage(body: unknown, fallback: string) {
+  if (!body || typeof body !== "object") return fallback;
+  const detail = (body as { detail?: unknown }).detail;
+  if (typeof detail === "string" && detail.trim()) return detail;
+  return fallback;
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.headers);
   headers.set("Content-Type", "application/json");
@@ -137,8 +148,11 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       clearAdminToken();
       throw new Error("Your admin session has expired. Please log in again.");
     }
+    if (response.status === 502 || response.status === 503) {
+      throw new Error(unavailableMessage());
+    }
     const body = await response.json().catch(() => ({}));
-    throw new Error(body.detail || "The request could not be completed.");
+    throw new Error(detailMessage(body, "The request could not be completed."));
   }
   return response.status === 204 ? (undefined as T) : (response.json() as Promise<T>);
 }
@@ -152,10 +166,40 @@ async function requestFile(path: string): Promise<Blob> {
       clearAdminToken();
       throw new Error("Your admin session has expired. Please log in again.");
     }
+    if (response.status === 502 || response.status === 503) {
+      throw new Error(unavailableMessage());
+    }
     const body = await response.json().catch(() => ({}));
-    throw new Error(body.detail || "The export could not be completed.");
+    throw new Error(detailMessage(body, "The export could not be completed."));
   }
   return response.blob();
+}
+
+type PptZipManifest = { filename: string; files: { path: string; url: string }[] };
+
+async function requestPptZip(path: string) {
+  const response = await fetch(`${API_URL}/admin${path}`, {
+    credentials: "include",
+    headers: adminToken() ? { Authorization: `Bearer ${adminToken()}` } : undefined,
+  });
+  if (!response.ok) {
+    if (response.status === 401) {
+      clearAdminToken();
+      throw new Error("Your admin session has expired. Please log in again.");
+    }
+    if (response.status === 502 || response.status === 503) {
+      throw new Error(unavailableMessage());
+    }
+    const body = await response.json().catch(() => ({}));
+    throw new Error(detailMessage(body, "The export could not be completed."));
+  }
+  const type = response.headers.get("content-type") || "";
+  if (type.includes("application/zip") || type.includes("octet-stream")) {
+    return response.blob();
+  }
+  const manifest = (await response.json()) as PptZipManifest;
+  const { zipStoredFiles } = await import("./zip-store");
+  return zipStoredFiles(manifest.files);
 }
 const query = (params: Record<string, string | boolean | undefined>) => {
   const value = new URLSearchParams();
@@ -225,8 +269,8 @@ export const adminApi = {
       `/ppt/${id}/download${version ? `?version=${version}` : ""}`,
     ),
   pptThemeDownload: (theme: string) =>
-    requestFile(`/ppt/themes/${encodeURIComponent(theme)}/download`),
-  pptDownloadAll: () => requestFile("/ppt/download-all"),
+    requestPptZip(`/ppt/themes/${encodeURIComponent(theme)}/download`),
+  pptDownloadAll: () => requestPptZip("/ppt/download-all"),
   reviewPpt: (
     id: string,
     payload: { status: PptReviewStatus; reviewer_remarks: string; internal_notes: string },
@@ -271,9 +315,12 @@ export type LeaderboardRow = {
   team_name: string;
   theme: string;
   domain: string;
+  track_id: string;
+  track_name: string;
   score: number;
   max_score: number;
   judges_count: number;
+  judges_required: number;
 };
 const evaluationRequest = <T>(path: string, options: RequestInit = {}) =>
   request<T>(`/evaluation${path}`, options);
