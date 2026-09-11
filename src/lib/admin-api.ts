@@ -309,18 +309,71 @@ export type Criterion = {
   is_active: boolean;
 };
 export type LeaderboardRow = {
-  rank: number;
+  rank: number | null;
+  overall_rank: number | null;
+  track_rank: number | null;
   registration_id: string;
   reference_id: string;
   team_name: string;
+  problem_statement: string;
+  ps_id: string;
   theme: string;
   domain: string;
   track_id: string;
   track_name: string;
-  score: number;
+  track_code?: string;
+  judge_id: string;
+  judge_name: string;
+  raw_score: number | null;
+  score: number | null;
   max_score: number;
+  raw_percentage: number | null;
+  track_mean: number | null;
+  track_stddev: number | null;
+  z_score: number | null;
+  normalized_score: number | null;
   judges_count: number;
   judges_required: number;
+  evaluation_status: "completed" | "pending";
+  normalization_status: string;
+  normalization_reliable: boolean;
+  is_finalist: boolean;
+};
+export type LeaderboardSummary = {
+  tracks: number;
+  total_teams: number;
+  evaluated: number;
+  pending: number;
+  malformed_evaluations: number;
+  criteria_max: number;
+  min_zscore_sample: number;
+};
+export type TrackStat = {
+  track_id: string;
+  track_name: string;
+  track_code: string;
+  judge_ids: string[];
+  judge_names: string[];
+  total_teams: number;
+  evaluated_teams: number;
+  pending_teams: number;
+  mean_raw_score: number | null;
+  stddev: number | null;
+  minimum: number | null;
+  maximum: number | null;
+  normalization_status: string;
+  normalization_reliable: boolean;
+};
+export type TeamResultCriterion = {
+  criterion_id: string;
+  name: string;
+  score: number | null;
+  max_marks: number;
+  description: string;
+};
+export type TeamResult = LeaderboardRow & {
+  criteria: TeamResultCriterion[];
+  normalization_explanation: string;
 };
 const evaluationRequest = <T>(path: string, options: RequestInit = {}) =>
   request<T>(`/evaluation${path}`, options);
@@ -363,12 +416,30 @@ export const evaluationApi = {
     evaluationRequest("/criteria", { method: "POST", body: JSON.stringify(x) }),
   updateCriterion: (id: string, x: Omit<Criterion, "id">) =>
     evaluationRequest(`/criteria/${id}`, { method: "PATCH", body: JSON.stringify(x) }),
-  leaderboard: (params?: { search?: string; domain?: string; track_id?: string }) => {
+  leaderboard: (params?: {
+    search?: string;
+    domain?: string;
+    track_id?: string;
+    status?: "completed" | "pending" | "all";
+    finalists?: number;
+  }) => {
     const query = new URLSearchParams();
     if (params?.search) query.set("search", params.search);
     if (params?.domain) query.set("domain", params.domain);
     if (params?.track_id) query.set("track_id", params.track_id);
+    if (params?.status) query.set("status", params.status);
+    if (params?.finalists) query.set("finalists", String(params.finalists));
     const suffix = query.toString() ? `?${query}` : "";
-    return evaluationRequest<{ data: LeaderboardRow[] }>(`/leaderboard${suffix}`);
+    return evaluationRequest<{ data: LeaderboardRow[]; summary: LeaderboardSummary }>(
+      `/leaderboard${suffix}`,
+    );
   },
+  trackStats: () =>
+    evaluationRequest<{ data: TrackStat[]; summary: LeaderboardSummary }>("/leaderboard/tracks"),
+  teamResult: (registrationId: string, finalists?: number) =>
+    evaluationRequest<TeamResult>(
+      `/results/${encodeURIComponent(registrationId)}${finalists ? `?finalists=${finalists}` : ""}`,
+    ),
+  exportResults: (finalists?: number) =>
+    requestFile(`/evaluation/export?format=xlsx${finalists ? `&finalists=${finalists}` : ""}`),
 };

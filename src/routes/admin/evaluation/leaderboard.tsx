@@ -1,6 +1,12 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { Leaderboard } from "@/components/evaluation-admin";
+import { Outlet, createFileRoute, useChildMatches } from "@tanstack/react-router";
+import { Leaderboard } from "@/components/evaluation-results";
 
 export const Route = createFileRoute("/admin/evaluation/leaderboard")({
-  component: Leaderboard,
+  component: LeaderboardLayout,
 });
+
+function LeaderboardLayout() {
+  const childMatches = useChildMatches();
+  if (childMatches.length) return <Outlet />;
+  return <Leaderboard />;
+}

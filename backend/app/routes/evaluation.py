@@ -1,15 +1,23 @@
 """Mongo-backed evaluation configuration and restricted evaluation sessions."""
 from datetime import datetime, timedelta, timezone
 from math import isfinite
-from typing import Optional
+from typing import Literal, Optional
 import os, re, uuid, bcrypt, jwt
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, Cookie, Query, Request, Response
+from fastapi.responses import StreamingResponse
 from pymongo.errors import DuplicateKeyError
 from pydantic import BaseModel, Field
 from app.config import ADMIN_JWT_SECRET
 from app.mongodb import evaluation_track_collection as tracks, judge_collection as judges, track_coordinator_collection as coordinators, presentation_queue_collection as queues, evaluation_criteria_collection as criteria, evaluation_collection as evaluations, registration_collection as registrations, evaluation_option_collection as options, theme_collection as theme_docs, problem_collection as problems
 from app.routes.admin import require, csrf_guard
+from app.services.evaluation_results import (
+    build_results_workbook,
+    compute_results,
+    filter_leaderboard,
+    serialize_team_result,
+    serialize_track_stat,
+)
 
 admin=APIRouter(prefix="/admin/evaluation",tags=["Evaluation"]); judge=APIRouter(prefix="/judge",tags=["Judge Evaluation"]); coordinator=APIRouter(prefix="/track",tags=["Track Queue"])
 class TrackIn(BaseModel):
@@ -257,39 +265,46 @@ async def create_option(x:LabelIn,user=Depends(require("manage_evaluation"))):
  try: await options.insert_one({"kind":kind,"value":value,"created_at":datetime.now(timezone.utc)})
  except DuplicateKeyError: pass
  return {"success":True,"kind":kind,"value":value}
+async def evaluation_results_snapshot():
+    """Load current tracks, criteria, evaluations, and registrations for ranking."""
+    track_docs=[t async for t in tracks.find()]
+    judge_docs=[j async for j in judges.find()]
+    criterion_docs=[c async for c in criteria.find({"is_active":True})]
+    evaluation_docs=[e async for e in evaluations.find()]
+    registration_docs=[r async for r in registrations.find({"isDeleted":{"$ne":True}})]
+    assigned={t["track_id"]:[r["registration_id"] for r in registration_docs if match(r,t)] for t in track_docs if t.get("track_id")}
+    return compute_results(tracks=track_docs,judges=judge_docs,criteria=criterion_docs,evaluations=evaluation_docs,registrations=registration_docs,assigned_by_track=assigned)
+
 @admin.get("/leaderboard")
-async def leaderboard(search:Optional[str]=None,domain:Optional[str]=None,track_id:Optional[str]=None,user=Depends(require("manage_evaluation"))):
- cs=[c async for c in criteria.find({"is_active":True})]; criterion_max=sum(c.get("max_marks",0) for c in cs)
- track_docs={t["track_id"]:t async for t in tracks.find()}
- if track_id and track_id not in track_docs: raise HTTPException(404,"Track not found.")
- query={"status":"submitted"}
- if track_id: query["track_id"]=track_id
- grouped={}
- async for ev in evaluations.find(query):
-  tid=ev.get("track_id")
-  rid=ev.get("registration_id")
-  if not tid or not rid: continue
-  grouped.setdefault((tid,rid),[]).append(float(ev.get("total_score") or 0))
- rids=list({rid for _,rid in grouped})
- regs={r["registration_id"]:r async for r in registrations.find({"isDeleted":{"$ne":True},"registration_id":{"$in":rids}})} if rids else {}
- by_track={}
- for (tid,rid),scores in grouped.items():
-  track=track_docs.get(tid); reg=regs.get(rid)
-  if not track or not reg: continue
-  team=public_team(reg)
-  judges_required=int(track.get("judges_required") or len(scores) or 1)
-  by_track.setdefault(tid,[]).append({**team,"track_id":tid,"track_name":track.get("name",""),"score":round(sum(scores),2),"max_score":criterion_max*judges_required,"judges_count":len(scores),"judges_required":judges_required})
- rows=[]
- for tid,track_rows in by_track.items():
-  track_rows.sort(key=lambda r:(-r["score"],r["team_name"].casefold()))
-  for i,row in enumerate(track_rows,1): row["rank"]=i
-  rows.extend(track_rows)
- q=(search or "").strip().casefold(); domain_q=(domain or "").strip().casefold()
- if domain_q: rows=[r for r in rows if r["domain"].strip().casefold()==domain_q]
- if q:
-  rows=[r for r in rows if q in " ".join([r["reference_id"],r["team_name"],r["ps_id"],r["theme"],r["domain"],r["track_name"]]).casefold()]
- rows.sort(key=lambda r:(r["track_name"].casefold(),r["rank"]))
- return {"data":rows}
+async def leaderboard(search:Optional[str]=None,domain:Optional[str]=None,track_id:Optional[str]=None,status:Literal["completed","pending","all"]="completed",finalists:Optional[int]=Query(default=None,ge=1),user=Depends(require("manage_evaluation"))):
+    results=await evaluation_results_snapshot()
+    if track_id and track_id not in {t["track_id"] for t in results["track_stats"]}:
+        raise HTTPException(404,"Track not found.")
+    rows=filter_leaderboard(results,search=search,domain=domain,track_id=track_id,status=status,finalists=finalists)
+    return {"data":rows,"summary":results["summary"],"malformed":results["malformed"]}
+
+@admin.get("/leaderboard/tracks")
+async def leaderboard_tracks(user=Depends(require("manage_evaluation"))):
+    results=await evaluation_results_snapshot()
+    return {"data":[serialize_track_stat(stat) for stat in results["track_stats"]],"summary":results["summary"]}
+
+@admin.get("/results/{registration_id}")
+async def team_result(registration_id:str,finalists:Optional[int]=Query(default=None,ge=1),user=Depends(require("manage_evaluation"))):
+    results=await evaluation_results_snapshot()
+    matches=[row for row in results["rows"] if row.get("registration_id","").casefold()==registration_id.strip().casefold()]
+    if not matches:
+        raise HTTPException(404,"No completed evaluation found for this team.")
+    row=sorted(matches,key=lambda item:item.get("overall_rank") or 10**9)[0]
+    return serialize_team_result(row,results["criteria"],finalists)
+
+@admin.get("/export")
+async def export_results(format:Literal["xlsx"]="xlsx",finalists:Optional[int]=Query(default=None,ge=1),user=Depends(require("manage_evaluation"))):
+    if format!="xlsx":
+        raise HTTPException(422,"Only xlsx export is supported.")
+    results=await evaluation_results_snapshot()
+    payload=build_results_workbook(results,finalists)
+    filename=f"sih-evaluation-results-{datetime.now(timezone.utc).date()}.xlsx"
+    return StreamingResponse(iter([payload]),media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",headers={"Content-Disposition":f'attachment; filename="{filename}"'})
 @judge.get("/tracks")
 @coordinator.get("/tracks")
 async def public_tracks(): return {"data":[{"track_id":x["track_id"],"name":x["name"],"domain":", ".join(track_domains(x)),"domains":track_domains(x)} for x in await active_tracks()]}

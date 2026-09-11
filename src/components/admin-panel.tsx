@@ -188,7 +188,7 @@ export function AdminPage({
   page,
   children,
 }: {
-  page: "dashboard" | "registrations" | "ppt" | "announcements" | "email" | "activity";
+  page: "dashboard" | "registrations" | "ppt" | "announcements" | "email" | "activity" | "evaluation";
   children?: React.ReactNode;
 }) {
   const nav = useNavigate(),

@@ -41,9 +41,12 @@ import { Route as AdminEvaluationCoordinatorsRouteImport } from './routes/admin/
 import { Route as AdminEvaluationCriteriaRouteImport } from './routes/admin/evaluation/criteria'
 import { Route as AdminEvaluationJudgesRouteImport } from './routes/admin/evaluation/judges'
 import { Route as AdminEvaluationLeaderboardRouteImport } from './routes/admin/evaluation/leaderboard'
+import { Route as AdminEvaluationResultsRouteImport } from './routes/admin/evaluation/results'
 import { Route as AdminEvaluationTracksRouteImport } from './routes/admin/evaluation/tracks'
 import { Route as AdminPptIdRouteImport } from './routes/admin/ppt/$id'
 import { Route as AdminRegistrationsIdRouteImport } from './routes/admin/registrations/$id'
+import { Route as AdminEvaluationLeaderboardTrackIdRouteImport } from './routes/admin/evaluation/leaderboard/$trackId'
+import { Route as AdminEvaluationResultsRegistrationIdRouteImport } from './routes/admin/evaluation/results/$registrationId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -208,6 +211,11 @@ const AdminEvaluationLeaderboardRoute =
     path: '/admin/evaluation/leaderboard',
     getParentRoute: () => rootRouteImport,
   } as any)
+const AdminEvaluationResultsRoute = AdminEvaluationResultsRouteImport.update({
+  id: '/admin/evaluation/results',
+  path: '/admin/evaluation/results',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminEvaluationTracksRoute = AdminEvaluationTracksRouteImport.update({
   id: '/admin/evaluation/tracks',
   path: '/admin/evaluation/tracks',
@@ -223,6 +231,18 @@ const AdminRegistrationsIdRoute = AdminRegistrationsIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => AdminRegistrationsRoute,
 } as any)
+const AdminEvaluationLeaderboardTrackIdRoute =
+  AdminEvaluationLeaderboardTrackIdRouteImport.update({
+    id: '/$trackId',
+    path: '/$trackId',
+    getParentRoute: () => AdminEvaluationLeaderboardRoute,
+  } as any)
+const AdminEvaluationResultsRegistrationIdRoute =
+  AdminEvaluationResultsRegistrationIdRouteImport.update({
+    id: '/$registrationId',
+    path: '/$registrationId',
+    getParentRoute: () => AdminEvaluationResultsRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -255,11 +275,14 @@ export interface FileRoutesByFullPath {
   '/admin/evaluation/coordinators': typeof AdminEvaluationCoordinatorsRoute
   '/admin/evaluation/criteria': typeof AdminEvaluationCriteriaRoute
   '/admin/evaluation/judges': typeof AdminEvaluationJudgesRoute
-  '/admin/evaluation/leaderboard': typeof AdminEvaluationLeaderboardRoute
+  '/admin/evaluation/leaderboard': typeof AdminEvaluationLeaderboardRouteWithChildren
+  '/admin/evaluation/results': typeof AdminEvaluationResultsRouteWithChildren
   '/admin/evaluation/tracks': typeof AdminEvaluationTracksRoute
   '/admin/ppt/$id': typeof AdminPptIdRoute
   '/admin/registrations/$id': typeof AdminRegistrationsIdRoute
   '/admin/evaluation/': typeof AdminEvaluationIndexRoute
+  '/admin/evaluation/leaderboard/$trackId': typeof AdminEvaluationLeaderboardTrackIdRoute
+  '/admin/evaluation/results/$registrationId': typeof AdminEvaluationResultsRegistrationIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -292,11 +315,14 @@ export interface FileRoutesByTo {
   '/admin/evaluation/coordinators': typeof AdminEvaluationCoordinatorsRoute
   '/admin/evaluation/criteria': typeof AdminEvaluationCriteriaRoute
   '/admin/evaluation/judges': typeof AdminEvaluationJudgesRoute
-  '/admin/evaluation/leaderboard': typeof AdminEvaluationLeaderboardRoute
+  '/admin/evaluation/leaderboard': typeof AdminEvaluationLeaderboardRouteWithChildren
+  '/admin/evaluation/results': typeof AdminEvaluationResultsRouteWithChildren
   '/admin/evaluation/tracks': typeof AdminEvaluationTracksRoute
   '/admin/ppt/$id': typeof AdminPptIdRoute
   '/admin/registrations/$id': typeof AdminRegistrationsIdRoute
   '/admin/evaluation': typeof AdminEvaluationIndexRoute
+  '/admin/evaluation/leaderboard/$trackId': typeof AdminEvaluationLeaderboardTrackIdRoute
+  '/admin/evaluation/results/$registrationId': typeof AdminEvaluationResultsRegistrationIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -330,11 +356,14 @@ export interface FileRoutesById {
   '/admin/evaluation/coordinators': typeof AdminEvaluationCoordinatorsRoute
   '/admin/evaluation/criteria': typeof AdminEvaluationCriteriaRoute
   '/admin/evaluation/judges': typeof AdminEvaluationJudgesRoute
-  '/admin/evaluation/leaderboard': typeof AdminEvaluationLeaderboardRoute
+  '/admin/evaluation/leaderboard': typeof AdminEvaluationLeaderboardRouteWithChildren
+  '/admin/evaluation/results': typeof AdminEvaluationResultsRouteWithChildren
   '/admin/evaluation/tracks': typeof AdminEvaluationTracksRoute
   '/admin/ppt/$id': typeof AdminPptIdRoute
   '/admin/registrations/$id': typeof AdminRegistrationsIdRoute
   '/admin/evaluation/': typeof AdminEvaluationIndexRoute
+  '/admin/evaluation/leaderboard/$trackId': typeof AdminEvaluationLeaderboardTrackIdRoute
+  '/admin/evaluation/results/$registrationId': typeof AdminEvaluationResultsRegistrationIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -370,10 +399,13 @@ export interface FileRouteTypes {
     | '/admin/evaluation/criteria'
     | '/admin/evaluation/judges'
     | '/admin/evaluation/leaderboard'
+    | '/admin/evaluation/results'
     | '/admin/evaluation/tracks'
     | '/admin/ppt/$id'
     | '/admin/registrations/$id'
     | '/admin/evaluation/'
+    | '/admin/evaluation/leaderboard/$trackId'
+    | '/admin/evaluation/results/$registrationId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -407,10 +439,13 @@ export interface FileRouteTypes {
     | '/admin/evaluation/criteria'
     | '/admin/evaluation/judges'
     | '/admin/evaluation/leaderboard'
+    | '/admin/evaluation/results'
     | '/admin/evaluation/tracks'
     | '/admin/ppt/$id'
     | '/admin/registrations/$id'
     | '/admin/evaluation'
+    | '/admin/evaluation/leaderboard/$trackId'
+    | '/admin/evaluation/results/$registrationId'
   id:
     | '__root__'
     | '/'
@@ -444,10 +479,13 @@ export interface FileRouteTypes {
     | '/admin/evaluation/criteria'
     | '/admin/evaluation/judges'
     | '/admin/evaluation/leaderboard'
+    | '/admin/evaluation/results'
     | '/admin/evaluation/tracks'
     | '/admin/ppt/$id'
     | '/admin/registrations/$id'
     | '/admin/evaluation/'
+    | '/admin/evaluation/leaderboard/$trackId'
+    | '/admin/evaluation/results/$registrationId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -480,7 +518,8 @@ export interface RootRouteChildren {
   AdminEvaluationCoordinatorsRoute: typeof AdminEvaluationCoordinatorsRoute
   AdminEvaluationCriteriaRoute: typeof AdminEvaluationCriteriaRoute
   AdminEvaluationJudgesRoute: typeof AdminEvaluationJudgesRoute
-  AdminEvaluationLeaderboardRoute: typeof AdminEvaluationLeaderboardRoute
+  AdminEvaluationLeaderboardRoute: typeof AdminEvaluationLeaderboardRouteWithChildren
+  AdminEvaluationResultsRoute: typeof AdminEvaluationResultsRouteWithChildren
   AdminEvaluationTracksRoute: typeof AdminEvaluationTracksRoute
   AdminEvaluationIndexRoute: typeof AdminEvaluationIndexRoute
 }
@@ -711,6 +750,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminEvaluationLeaderboardRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/evaluation/results': {
+      id: '/admin/evaluation/results'
+      path: '/admin/evaluation/results'
+      fullPath: '/admin/evaluation/results'
+      preLoaderRoute: typeof AdminEvaluationResultsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/evaluation/tracks': {
       id: '/admin/evaluation/tracks'
       path: '/admin/evaluation/tracks'
@@ -731,6 +777,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/registrations/$id'
       preLoaderRoute: typeof AdminRegistrationsIdRouteImport
       parentRoute: typeof AdminRegistrationsRoute
+    }
+    '/admin/evaluation/leaderboard/$trackId': {
+      id: '/admin/evaluation/leaderboard/$trackId'
+      path: '/$trackId'
+      fullPath: '/admin/evaluation/leaderboard/$trackId'
+      preLoaderRoute: typeof AdminEvaluationLeaderboardTrackIdRouteImport
+      parentRoute: typeof AdminEvaluationLeaderboardRoute
+    }
+    '/admin/evaluation/results/$registrationId': {
+      id: '/admin/evaluation/results/$registrationId'
+      path: '/$registrationId'
+      fullPath: '/admin/evaluation/results/$registrationId'
+      preLoaderRoute: typeof AdminEvaluationResultsRegistrationIdRouteImport
+      parentRoute: typeof AdminEvaluationResultsRoute
     }
   }
 }
@@ -769,6 +829,36 @@ const AdminRegistrationsRouteChildren: AdminRegistrationsRouteChildren = {
 const AdminRegistrationsRouteWithChildren =
   AdminRegistrationsRoute._addFileChildren(AdminRegistrationsRouteChildren)
 
+interface AdminEvaluationLeaderboardRouteChildren {
+  AdminEvaluationLeaderboardTrackIdRoute: typeof AdminEvaluationLeaderboardTrackIdRoute
+}
+
+const AdminEvaluationLeaderboardRouteChildren: AdminEvaluationLeaderboardRouteChildren =
+  {
+    AdminEvaluationLeaderboardTrackIdRoute:
+      AdminEvaluationLeaderboardTrackIdRoute,
+  }
+
+const AdminEvaluationLeaderboardRouteWithChildren =
+  AdminEvaluationLeaderboardRoute._addFileChildren(
+    AdminEvaluationLeaderboardRouteChildren,
+  )
+
+interface AdminEvaluationResultsRouteChildren {
+  AdminEvaluationResultsRegistrationIdRoute: typeof AdminEvaluationResultsRegistrationIdRoute
+}
+
+const AdminEvaluationResultsRouteChildren: AdminEvaluationResultsRouteChildren =
+  {
+    AdminEvaluationResultsRegistrationIdRoute:
+      AdminEvaluationResultsRegistrationIdRoute,
+  }
+
+const AdminEvaluationResultsRouteWithChildren =
+  AdminEvaluationResultsRoute._addFileChildren(
+    AdminEvaluationResultsRouteChildren,
+  )
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   GuidelinesRoute: GuidelinesRoute,
@@ -799,7 +889,8 @@ const rootRouteChildren: RootRouteChildren = {
   AdminEvaluationCoordinatorsRoute: AdminEvaluationCoordinatorsRoute,
   AdminEvaluationCriteriaRoute: AdminEvaluationCriteriaRoute,
   AdminEvaluationJudgesRoute: AdminEvaluationJudgesRoute,
-  AdminEvaluationLeaderboardRoute: AdminEvaluationLeaderboardRoute,
+  AdminEvaluationLeaderboardRoute: AdminEvaluationLeaderboardRouteWithChildren,
+  AdminEvaluationResultsRoute: AdminEvaluationResultsRouteWithChildren,
   AdminEvaluationTracksRoute: AdminEvaluationTracksRoute,
   AdminEvaluationIndexRoute: AdminEvaluationIndexRoute,
 }
