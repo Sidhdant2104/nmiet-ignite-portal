@@ -16,6 +16,7 @@ type SortKey =
   | "team_name"
   | "track_name"
   | "raw_percentage"
+  | "track_percentile"
   | "normalized_score"
   | "track_rank";
 
@@ -36,7 +37,7 @@ function fmt(value: number | null | undefined, digits = 2) {
 }
 
 function statusLabel(status: string | undefined) {
-  if (status === "ok") return "Normalized";
+  if (status === "ok") return "Ranked";
   if (status === "zero_variance") return "Zero variance";
   if (status === "unreliable_small_sample") return "Small sample";
   if (status === "pending" || status === "no_evaluated_teams") return "Pending";
@@ -157,9 +158,9 @@ export function Leaderboard() {
         <div>
           <h1 className="text-3xl font-bold">Evaluation Results</h1>
           <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-            Teams are ranked by track-normalized score so judges who mark strictly or generously can
-            be compared fairly. Raw scores are preserved. Finalist badges are a view cutoff only —
-            they do not change registration records.
+            Teams are ranked by final score: 70% raw percentage plus 30% percentile within the
+            track. Raw scores are preserved. Finalist badges are a view cutoff only — they do not
+            change registration records.
           </p>
         </div>
         <Button disabled={exportFile.isPending} onClick={() => exportFile.mutate()}>
@@ -254,7 +255,15 @@ export function Leaderboard() {
               </th>
               <th className="p-4">
                 <SortButton
-                  label="Normalized score"
+                  label="Track %ile"
+                  active={sortKey === "track_percentile"}
+                  direction={sortDirection}
+                  onClick={() => toggleSort("track_percentile")}
+                />
+              </th>
+              <th className="p-4">
+                <SortButton
+                  label="Final score"
                   active={sortKey === "normalized_score"}
                   direction={sortDirection}
                   onClick={() => toggleSort("normalized_score")}
@@ -274,7 +283,7 @@ export function Leaderboard() {
           <tbody>
             {q.isLoading ? (
               <tr>
-                <td className="p-4 text-muted-foreground" colSpan={7}>
+                <td className="p-4 text-muted-foreground" colSpan={8}>
                   Loading leaderboard…
                 </td>
               </tr>
@@ -310,8 +319,11 @@ export function Leaderboard() {
                       {fmt(row.raw_score)} / {fmt(row.max_score, 0)}
                     </p>
                   </td>
+                  <td className="p-4">{fmt(row.track_percentile)}</td>
                   <td className="p-4">
-                    <span className="text-lg font-bold">{fmt(row.normalized_score)}</span>
+                    <span className="text-lg font-bold">
+                      {fmt(row.final_score ?? row.normalized_score)}
+                    </span>
                     {row.is_finalist ? (
                       <Badge className="ml-2 border-0 bg-emerald-500/15 text-emerald-700">
                         FINALIST
@@ -332,7 +344,7 @@ export function Leaderboard() {
               ))
             ) : (
               <tr>
-                <td className="p-4 text-muted-foreground" colSpan={7}>
+                <td className="p-4 text-muted-foreground" colSpan={8}>
                   No evaluations match these filters.
                 </td>
               </tr>
@@ -420,13 +432,14 @@ export function TrackLeaderboard({ trackId }: { trackId: string }) {
               <th className="p-4">Team</th>
               <th className="p-4">Raw score</th>
               <th className="p-4">Raw %</th>
-              <th className="p-4">Normalized score</th>
+              <th className="p-4">Track %ile</th>
+              <th className="p-4">Final score</th>
             </tr>
           </thead>
           <tbody>
             {q.isLoading ? (
               <tr>
-                <td className="p-4 text-muted-foreground" colSpan={5}>
+                <td className="p-4 text-muted-foreground" colSpan={6}>
                   Loading track results…
                 </td>
               </tr>
@@ -448,12 +461,15 @@ export function TrackLeaderboard({ trackId }: { trackId: string }) {
                     {fmt(row.raw_score)} / {fmt(row.max_score, 0)}
                   </td>
                   <td className="p-4">{fmt(row.raw_percentage)}</td>
-                  <td className="p-4 text-lg font-bold">{fmt(row.normalized_score)}</td>
+                  <td className="p-4">{fmt(row.track_percentile)}</td>
+                  <td className="p-4 text-lg font-bold">
+                    {fmt(row.final_score ?? row.normalized_score)}
+                  </td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td className="p-4 text-muted-foreground" colSpan={5}>
+                <td className="p-4 text-muted-foreground" colSpan={6}>
                   No completed evaluations in this track.
                 </td>
               </tr>
@@ -551,12 +567,11 @@ export function TeamEvaluationResult({ registrationId }: { registrationId: strin
           value={`${fmt(result.raw_score)} / ${fmt(result.max_score, 0)}`}
         />
         <StatCard label="Raw percentage" value={fmt(result.raw_percentage)} />
+        <StatCard label="Track percentile" value={fmt(result.track_percentile)} />
+        <StatCard label="Final score" value={fmt(result.final_score ?? result.normalized_score)} />
         <StatCard label="Track average" value={fmt(result.track_mean)} />
-        <StatCard label="Track standard deviation" value={fmt(result.track_stddev)} />
-        <StatCard label="Normalized score" value={fmt(result.normalized_score)} />
         <StatCard label="Track rank" value={result.track_rank ?? "—"} />
         <StatCard label="Overall rank" value={result.overall_rank ?? "—"} />
-        <StatCard label="Normalization" value={statusLabel(result.normalization_status)} />
       </div>
       <p className="mt-6 max-w-3xl text-sm text-muted-foreground">
         {result.normalization_explanation}

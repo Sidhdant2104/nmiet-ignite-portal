@@ -330,7 +330,8 @@ export type LeaderboardRow = {
   raw_percentage: number | null;
   track_mean: number | null;
   track_stddev: number | null;
-  z_score: number | null;
+  track_percentile: number | null;
+  final_score: number | null;
   normalized_score: number | null;
   judges_count: number;
   judges_required: number;
@@ -346,7 +347,8 @@ export type LeaderboardSummary = {
   pending: number;
   malformed_evaluations: number;
   criteria_max: number;
-  min_zscore_sample: number;
+  raw_weight?: number;
+  percentile_weight?: number;
 };
 export type TrackStat = {
   track_id: string;

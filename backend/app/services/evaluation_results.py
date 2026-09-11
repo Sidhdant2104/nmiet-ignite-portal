@@ -1,26 +1,15 @@
-"""Track-level z-score normalization for cross-track evaluation comparison.
+"""Leaderboard ranking: 70% raw percentage + 30% within-track percentile.
 
 Raw scores are never overwritten. All derived statistics are computed on each
-request so the leaderboard cannot go stale.
+request so the leaderboard cannot go stale. Evaluation documents are not modified.
 
-Criteria currently have max_marks only (no weights). raw_score is the sum of
-criterion scores, matching judge submission.
+    RawPercentage = (raw_score / max_score) * 100
+    TrackPercentile = 100 * (teams in this track with a strictly lower raw_score) / (n - 1)
+    FinalScore = (RawPercentage * 0.70) + (TrackPercentile * 0.30)
 
-Normalization (per track, among completed evaluations):
-
-    z = (raw_score - track_mean) / track_stddev     # population stddev
-    normalized_score = clamp(50 + 10 * z, 0, 100)
-
-Edge cases (documented and flagged, never silent):
-
-* stddev == 0 and n >= MIN_ZSCORE_SAMPLE:
-    every team gets normalized_score = 50
-    status = "zero_variance"
-* n < MIN_ZSCORE_SAMPLE:
-    z-scores are not statistically meaningful and are not computed
-    fallback: normalized_score = 50 (same center as the z-score scale)
-    within-track order still uses raw_percentage as the secondary sort
-    status = "unreliable_small_sample"
+Percentile is computed separately per track from completed evaluations only.
+A single evaluated team in a track receives TrackPercentile = 100.
+Z-scores are not used for ranking.
 """
 
 from __future__ import annotations
@@ -35,14 +24,14 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 
-MIN_ZSCORE_SAMPLE = 3
-NORMALIZED_CENTER = 50.0
-NORMALIZED_SCALE = 10.0
+RAW_WEIGHT = 0.70
+PERCENTILE_WEIGHT = 0.30
 NORMALIZED_MIN = 0.0
 NORMALIZED_MAX = 100.0
 
 NORMALIZATION_EXPLANATION = (
-    "The team's score was normalized relative to other evaluated teams in the same track."
+    "Final score is 70% of the team's raw percentage plus 30% of its percentile "
+    "among completed evaluations in the same track. Raw scores are unchanged."
 )
 
 STATUS_OK = "ok"
@@ -83,7 +72,7 @@ def mean(values: list[float]) -> float:
 
 
 def population_stddev(values: list[float]) -> float:
-    """Population standard deviation (divide by n). Zero when n < 2."""
+    """Population standard deviation (divide by n). Zero when n < 2. Descriptive only — not used for ranking."""
     n = len(values)
     if n < 2:
         return 0.0
@@ -92,31 +81,24 @@ def population_stddev(values: list[float]) -> float:
     return sqrt(variance)
 
 
-def normalize_score(raw_score: float, track_mean: float, track_stddev: float, sample_size: int, raw_percentage: float) -> dict:
-    """Return normalized_score, z_score, and normalization_status for one team."""
-    if sample_size < MIN_ZSCORE_SAMPLE:
-        # Do not emit a z-score from n<3. Park the team at the scale center so a
-        # two-team track cannot dominate the overall leaderboard via raw %.
-        return {
-            "z_score": None,
-            "normalized_score": NORMALIZED_CENTER,
-            "normalization_status": STATUS_SMALL_SAMPLE,
-            "normalization_reliable": False,
-        }
-    if track_stddev == 0:
-        return {
-            "z_score": 0.0,
-            "normalized_score": NORMALIZED_CENTER,
-            "normalization_status": STATUS_ZERO_VARIANCE,
-            "normalization_reliable": True,
-        }
-    z_score = (raw_score - track_mean) / track_stddev
-    return {
-        "z_score": z_score,
-        "normalized_score": clamp(NORMALIZED_CENTER + NORMALIZED_SCALE * z_score),
-        "normalization_status": STATUS_OK,
-        "normalization_reliable": True,
-    }
+def track_percentile(raw_score: float, track_scores: list[float]) -> float:
+    """Percentile rank of raw_score within one track, on a 0–100 scale.
+
+    TrackPercentile = 100 * (count of strictly lower scores) / (n - 1)
+    The unique highest score is 100. The unique lowest score is 0.
+    A track with one evaluated team is treated as the 100th percentile.
+    Unevaluated teams are never included in track_scores.
+    """
+    n = len(track_scores)
+    if n <= 1:
+        return 100.0
+    below = sum(1 for score in track_scores if score < raw_score)
+    return 100.0 * below / (n - 1)
+
+
+def compute_final_score(raw_percentage: float, percentile: float) -> float:
+    """FinalScore = (RawPercentage * 0.70) + (TrackPercentile * 0.30)."""
+    return clamp(raw_percentage * RAW_WEIGHT + percentile * PERCENTILE_WEIGHT)
 
 
 def _eval_timestamp(evaluation: dict) -> datetime:
@@ -173,8 +155,9 @@ def validate_evaluation(evaluation: dict, criteria_by_id: dict[str, dict]) -> tu
 
 def _sort_key(row: dict) -> tuple:
     return (
-        -float(row["normalized_score"]),
-        -float(row["raw_percentage"]),
+        -float(row["final_score"]),
+        -float(row["raw_score"]),
+        -float(row.get("track_percentile") or 0),
         str(row.get("team_name") or "").casefold(),
         str(row.get("registration_id") or "").casefold(),
     )
@@ -317,10 +300,6 @@ def compute_results(
         pending_ids = [rid for rid in assigned if rid not in evaluated_ids]
         if sample_size == 0:
             status = STATUS_NO_DATA
-        elif sample_size < MIN_ZSCORE_SAMPLE:
-            status = STATUS_SMALL_SAMPLE
-        elif track_stddev == 0:
-            status = STATUS_ZERO_VARIANCE
         else:
             status = STATUS_OK
 
@@ -332,15 +311,17 @@ def compute_results(
         ]
 
         for row in track_rows:
-            stats = normalize_score(row["raw_score"], track_mean or 0.0, track_stddev or 0.0, sample_size, row["raw_percentage"])
+            percentile = track_percentile(row["raw_score"], raw_scores)
+            score = compute_final_score(row["raw_percentage"], percentile)
             row.update(
                 {
                     "track_mean": track_mean,
                     "track_stddev": track_stddev,
-                    "z_score": stats["z_score"],
-                    "normalized_score": stats["normalized_score"],
-                    "normalization_status": stats["normalization_status"],
-                    "normalization_reliable": stats["normalization_reliable"],
+                    "track_percentile": percentile,
+                    "final_score": score,
+                    "normalized_score": score,
+                    "normalization_status": status,
+                    "normalization_reliable": True,
                     "evaluated_in_track": sample_size,
                 }
             )
@@ -363,7 +344,7 @@ def compute_results(
                 "minimum": min(raw_scores) if raw_scores else None,
                 "maximum": max(raw_scores) if raw_scores else None,
                 "normalization_status": status,
-                "normalization_reliable": status == STATUS_OK or status == STATUS_ZERO_VARIANCE,
+                "normalization_reliable": status == STATUS_OK,
             }
         )
 
@@ -399,6 +380,8 @@ def compute_results(
                     "raw_percentage": None,
                     "track_mean": None,
                     "track_stddev": None,
+                    "track_percentile": None,
+                    "final_score": None,
                     "normalized_score": None,
                     "track_rank": None,
                     "overall_rank": None,
@@ -420,7 +403,8 @@ def compute_results(
         "pending": len(assigned_ids - evaluated_ids),
         "malformed_evaluations": len(malformed),
         "criteria_max": criteria_max,
-        "min_zscore_sample": MIN_ZSCORE_SAMPLE,
+        "raw_weight": RAW_WEIGHT,
+        "percentile_weight": PERCENTILE_WEIGHT,
     }
 
     return {
@@ -457,8 +441,9 @@ def serialize_leaderboard_row(row: dict, finalists: Optional[int] = None) -> dic
         "raw_percentage": round2(row.get("raw_percentage")),
         "track_mean": round2(row.get("track_mean")),
         "track_stddev": round2(row.get("track_stddev")),
-        "z_score": round2(row.get("z_score")),
-        "normalized_score": round2(row.get("normalized_score")),
+        "track_percentile": round2(row.get("track_percentile")),
+        "final_score": round2(row.get("final_score")),
+        "normalized_score": round2(row.get("final_score") if row.get("final_score") is not None else row.get("normalized_score")),
         "track_rank": row.get("track_rank"),
         "overall_rank": overall_rank,
         "rank": overall_rank,
@@ -510,19 +495,12 @@ def serialize_team_result(row: dict, criteria: list[dict], finalists: Optional[i
 
 def methodology_text() -> dict:
     return {
-        "raw_score": "Sum of the team's criterion scores. Criteria are unweighted; each uses its configured max_marks.",
-        "raw_percentage": "raw_score / max_score * 100, where max_score is the sum of active criterion max_marks.",
-        "track_mean": "Mean raw_score of completed evaluations in the same track.",
-        "track_stddev": "Population standard deviation of those raw scores (divide by n, not n-1).",
-        "z_score": "z = (raw_score - track_mean) / track_stddev",
-        "normalized_score": "normalized_score = clamp(50 + (z * 10), 0, 100)",
-        "zero_stddev": "If standard deviation is 0, every team in the track receives normalized_score = 50.",
-        "small_sample": (
-            f"If a track has fewer than {MIN_ZSCORE_SAMPLE} evaluated teams, z-scores are not computed. "
-            "normalized_score is set to 50 (the z-score scale center) so a tiny sample cannot dominate "
-            f"the overall leaderboard. Within-track order still uses raw percentage. Status is '{STATUS_SMALL_SAMPLE}'."
-        ),
-        "ties": "Sort by normalized_score descending, then raw_percentage descending, then team_name ascending. Ranks are unique after this tie-break.",
+        "raw_score": "Sum of the team's criterion scores. Criteria are unweighted; each uses its configured max_marks. Historical evaluation documents are never rewritten.",
+        "raw_percentage": "RawPercentage = (raw_score / max_score) * 100. max_score is the sum of active criterion max_marks (currently 70).",
+        "track_percentile": "TrackPercentile is computed separately for each track from completed evaluations only. TrackPercentile = 100 × (number of teams in the track with a strictly lower raw_score) / (n − 1). The unique highest score is 100; the unique lowest is 0. A track with one evaluated team is 100. Unevaluated teams are excluded.",
+        "final_score": "FinalScore = (RawPercentage × 0.70) + (TrackPercentile × 0.30).",
+        "normalized_score": "Alias of FinalScore. Z-scores are not used.",
+        "ties": "Sort by FinalScore descending, then RawScore descending, then TrackPercentile descending, then team name. Ranks are unique after this tie-break.",
         "incomplete": "Only teams with a submitted evaluation covering every active criterion are ranked. Pending teams are omitted unless explicitly requested.",
         "duplicates": "A unique index prevents two evaluations by the same judge for the same team. If multiple judges score one team, their totals are averaged so a second score cannot inflate rank.",
     }
@@ -628,12 +606,10 @@ def build_results_workbook(results: dict, finalists: Optional[int] = None) -> by
             "Raw Score",
             "Max Score",
             "Raw Percentage",
-            "Track Mean",
-            "Track Std Dev",
-            "Normalized Score",
+            "Track Percentile",
+            "Final Score",
             "Track Rank",
             "Finalist",
-            "Normalization Status",
         ]
     )
     for row in results["rows"]:
@@ -648,15 +624,13 @@ def build_results_workbook(results: dict, finalists: Optional[int] = None) -> by
                 payload["raw_score"],
                 payload["max_score"],
                 payload["raw_percentage"],
-                payload["track_mean"],
-                payload["track_stddev"],
-                payload["normalized_score"],
+                payload["track_percentile"],
+                payload["final_score"],
                 payload["track_rank"],
                 "FINALIST" if payload["is_finalist"] else "",
-                payload["normalization_status"],
             ]
         )
-    _style_sheet(leaderboard, number_columns=("F", "G", "H", "I", "J", "K"))
+    _style_sheet(leaderboard, number_columns=("F", "G", "H", "I", "J"))
 
     stats_sheet = workbook.create_sheet("Track Statistics")
     stats_sheet.append(
@@ -711,22 +685,22 @@ def build_results_workbook(results: dict, finalists: Optional[int] = None) -> by
 
     method = workbook.create_sheet("Normalization Method")
     method_rows = [
-        ["NMIET SIH Internal Hackathon — Evaluation Normalization"],
+        ["NMIET SIH Internal Hackathon — Evaluation Ranking"],
         [""],
         ["Raw Score", methodology_text()["raw_score"]],
         ["Raw Percentage", methodology_text()["raw_percentage"]],
-        ["Track Mean", methodology_text()["track_mean"]],
-        ["Standard Deviation", methodology_text()["track_stddev"]],
-        ["Z-score", methodology_text()["z_score"]],
-        ["Normalized Score", methodology_text()["normalized_score"]],
+        ["Track Percentile", methodology_text()["track_percentile"]],
+        ["Final Score", methodology_text()["final_score"]],
         [""],
         ["Worked example"],
-        ["z = (score - track_mean) / track_stddev"],
-        ["normalized_score = 50 + (z × 10)"],
-        ["Scores are then clamped to the range 0–100."],
+        ["RawPercentage = (RawScore / 70) × 100"],
+        ["TrackPercentile = 100 × (teams with a lower raw score) / (n − 1)"],
+        ["FinalScore = (RawPercentage × 0.70) + (TrackPercentile × 0.30)"],
         [""],
-        ["Zero standard deviation", methodology_text()["zero_stddev"]],
-        ["Small tracks", methodology_text()["small_sample"]],
+        ["Example: 68/70 with track percentile 100"],
+        ["RawPercentage = 97.14"],
+        ["FinalScore = (97.14 × 0.70) + (100 × 0.30) = 98.00"],
+        [""],
         ["Tie handling", methodology_text()["ties"]],
         ["Incomplete evaluations", methodology_text()["incomplete"]],
         ["Duplicate evaluations", methodology_text()["duplicates"]],
