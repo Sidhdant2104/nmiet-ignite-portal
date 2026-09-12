@@ -25,9 +25,10 @@ from pydantic import BaseModel, EmailStr, Field
 
 from app.config import ADMIN_BOOTSTRAP_EMAIL, ADMIN_BOOTSTRAP_PASSWORD_HASH, ADMIN_JWT_SECRET, PORTAL_URL
 from copy import deepcopy
-from app.mongodb import admin_users_collection, announcement_collection, audit_collection, registration_collection, settings_collection
+from app.mongodb import admin_users_collection, announcement_collection, audit_collection, evaluation_track_collection, registration_collection, settings_collection
 from app.routes.ppt import STATUS as PPT_STATUSES, log_email
 from app.services.storage import create_signed_download, create_signed_preview
+from app.services.participation_statistics import add_statistics_sheet
 
 router = APIRouter(prefix="/admin", tags=["Administration"])
 Role = Literal["super_admin", "faculty", "student_spoc", "student_coordinator"]
@@ -403,6 +404,9 @@ async def export_registrations(format: Literal["csv","xlsx"]="csv", search: Opti
     for row in summary_values:
         summary_sheet.append(row)
     apply_sheet_style(summary_sheet)
+
+    track_docs = [track async for track in evaluation_track_collection.find({"is_active": True})]
+    add_statistics_sheet(workbook, registrations, track_docs)
 
     out=BytesIO(); workbook.save(out); out.seek(0); return StreamingResponse(out,media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",headers={"Content-Disposition":f'attachment; filename="{filename}"'})
 
